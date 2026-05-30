@@ -8,7 +8,8 @@ import numpy as np
 from time import time, sleep
 import signal
 from datetime import datetime
-from multiprocessing import Process, Queue, freeze_support
+from multiprocessing import Process, Queue, current_process, freeze_support
+from queue import Empty
 from threading import Event
 from bleak import BleakScanner
 
@@ -30,43 +31,75 @@ DEVICE_MAC_PREFIXES = ("00:80:E1",)
 KNOWN_SERVICE_UUID_PREFIXES = ("9fa48",)
 
 # ─── Data files ──────────────────────────────────────────────────────────────
-_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-eeg_file    = open(f"data/alchemiac_eeg_{_timestamp}.csv",    "w", newline="")
-motion_file = open(f"data/alchemiac_motion_{_timestamp}.csv", "w", newline="")
+_eeg_path = None
+_motion_path = None
+eeg_file = None
+motion_file = None
+eeg_writer = None
+motion_writer = None
 
-eeg_writer    = csv.writer(eeg_file)
-motion_writer = csv.writer(motion_file)
-eeg_writer.writerow(["AF8", "AF7", "CHEEK_R", "CHEEK_L", "EAR_R", "AFz", "BROW_L", "NOSE"])
-motion_writer.writerow(["x(g)", "y(g)", "z(g)", "x(deg/s)", "y(deg/s)", "z(deg/s)", "x(G)", "y(G)", "z(G)"])
+if current_process().name == "MainProcess":
+    _timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    _eeg_path    = f"data/alchemiac_eeg_{_timestamp}.csv"
+    _motion_path = f"data/alchemiac_motion_{_timestamp}.csv"
+    eeg_file    = open(_eeg_path,    "w", newline="")
+    motion_file = open(_motion_path, "w", newline="")
+
+    eeg_writer    = csv.writer(eeg_file)
+    motion_writer = csv.writer(motion_file)
+    eeg_writer.writerow(["timestamp", "AF8", "AF7", "CHEEK_R", "CHEEK_L", "EAR_R", "AFz", "BROW_L", "NOSE", "marker"])
+    motion_writer.writerow(["timestamp", "x(g)", "y(g)", "z(g)", "x(deg/s)", "y(deg/s)", "z(deg/s)", "x(G)", "y(G)", "z(G)"])
+
+_start_time = time()
 
 
 def _close_files():
+    if eeg_file is None or motion_file is None:
+        return
     eeg_file.close()
     motion_file.close()
+    import os
+    eeg_lines = sum(1 for _ in open(_eeg_path)) - 1
+    print(f"\n[DATA] {os.path.abspath(_eeg_path)}  ({eeg_lines} samples)")
 
 atexit.register(_close_files)
 
 
 # ─── Callbacks ───────────────────────────────────────────────────────────────
 q = None
+_shared = {"marker_queue": None, "pending_markers": 0}
 
 
 def eeg_callback(samples):
     global q
-    if not samples:           # skip empty packet (e.g. 0-byte data after header)
+    if not samples:
         return
     arr = np.array(samples, dtype=np.float64)
-    # Only forward well-formed 2-D arrays; log anything unexpected
     if arr.ndim != 2 or arr.shape[1] != 8:
         print(f"[EEG] Unexpected sample array shape {arr.shape}, skipping visualizer update.")
     elif q is not None:
         q.put(arr)
-    eeg_writer.writerows(samples)
+    t = time() - _start_time
+    mq = _shared["marker_queue"]
+    if mq is not None:
+        while True:
+            try:
+                mq.get_nowait()
+            except Empty:
+                break
+            _shared["pending_markers"] += 1
+    for sample in samples:
+        m = 1 if _shared["pending_markers"] > 0 else 0
+        if m:
+            _shared["pending_markers"] -= 1
+        eeg_writer.writerow([f"{t:.4f}"] + list(sample) + [m])
 
 
 def motion_callback(sample):
     ax, ay, az, gx, gy, gz, cx, cy, cz = sample
+    t = time() - _start_time
     motion_writer.writerow([
+        f"{t:.4f}",
         f"{ax:.5f}", f"{ay:.5f}", f"{az:.5f}",
         f"{gx:.5f}", f"{gy:.5f}", f"{gz:.5f}",
         f"{cx:.5f}", f"{cy:.5f}", f"{cz:.5f}",
@@ -226,7 +259,8 @@ if __name__ == "__main__":
 
     # 2. Start the EEG visualizer in a separate process
     q = Queue()
-    vis_process = Process(target=visualizer, args=(q,), kwargs={"display_channels": [0, 1, 2]})
+    _shared["marker_queue"] = Queue()
+    vis_process = Process(target=visualizer, args=(q,), kwargs={"marker_queue": _shared["marker_queue"], "display_channels": [0, 1, 2, 3, 4, 5, 6, 7]})
     vis_process.start()
 
     proxy = None
@@ -269,4 +303,8 @@ if __name__ == "__main__":
         if q is not None:
             q.close()
             q.join_thread()
+        marker_queue = _shared["marker_queue"]
+        if marker_queue is not None:
+            marker_queue.close()
+            marker_queue.join_thread()
         print("[MAIN] Shutdown complete. Goodbye!")
