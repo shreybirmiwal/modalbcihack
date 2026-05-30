@@ -62,36 +62,43 @@ class AlchemiacProxy:
         self.motion_queue = Queue()
 
         self.shutdown_event = asyncio.Event()
+        self.shutdown_requested = threading.Event()
         self.loop = None  # Global to hold the event loop reference
         
-        self.eeg_worker = threading.Thread(target=AlchemiacProxy.worker_process, args=(self.eeg_queue, eeg_callback))
+        self.eeg_worker = threading.Thread(target=AlchemiacProxy.worker_process, args=(self.eeg_queue, eeg_callback), daemon=True)
         self.eeg_worker.start()
 
-        self.motion_worker = threading.Thread(target=AlchemiacProxy.motion_process, args=(self.motion_queue, motion_callback))
+        self.motion_worker = threading.Thread(target=AlchemiacProxy.motion_process, args=(self.motion_queue, motion_callback), daemon=True)
         self.motion_worker.start()
         
-        self.async_thread = threading.Thread(target=self.run_async_main)
+        self.async_thread = threading.Thread(target=self.run_async_main, daemon=True)
         self.async_thread.start()
         
         pass
         
-    def waitForConnected(self):
+    def waitForConnected(self, should_stop=None):
         
         while not self.is_connected:
+            if self.shutdown_requested.is_set() or (should_stop is not None and should_stop()):
+                return False
+            if not self.async_thread.is_alive():
+                return False
             sleep(0.1)
-        pass
+        return True
         
     def disconnect(self):
    
         try:
             self.trigger_shutdown()
-            self.async_thread.join()
+            self.async_thread.join(timeout=5)
+            if self.async_thread.is_alive():
+                print("[AlchemiacProxy.py] BLE thread did not stop within timeout.")
         finally:
             # Stop the worker threads
             self.eeg_queue.put(None)  # Send sentinel to terminate the worker
             self.motion_queue.put(None)  # Send sentinel to terminate the worker
-            self.eeg_worker.join()
-            self.motion_worker.join()
+            self.eeg_worker.join(timeout=2)
+            self.motion_worker.join(timeout=2)
         pass
         
         
@@ -189,7 +196,10 @@ class AlchemiacProxy:
     def run_async_main(self):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self.main_task(self.mac_address))
+        try:
+            self.loop.run_until_complete(self.main_task(self.mac_address))
+        finally:
+            self.loop.close()
         
         
     def set_async_config(self):
@@ -199,7 +209,8 @@ class AlchemiacProxy:
         asyncio.run(set_config_tmp(self))   
 
     def trigger_shutdown(self):
-        if self.loop:
+        self.shutdown_requested.set()
+        if self.loop and self.loop.is_running():
             self.loop.call_soon_threadsafe(self.shutdown_event.set)
 
     
@@ -207,44 +218,58 @@ class AlchemiacProxy:
         # 00:80:E1:27:47:BC
 
         self.client = BleakClient(deviceAddress)
+        subscribed_uuids = []
         try:
             await self.client.connect()
             
             print(f"Connected to {deviceName} [{deviceAddress}]")
             self.is_connected = True
             start = time()
+            if self.shutdown_requested.is_set():
+                return
 
             # Subscribe to button notifications
             await self.client.start_notify(EVENT_UUID, self.notification_handler)
+            subscribed_uuids.append(EVENT_UUID)
             print("Subscribed to button notifications.")
+            if self.shutdown_requested.is_set():
+                return
             
             # Subscribe to accelerometer notifications
             await self.client.start_notify(MOTION_UUID, self.motion_handler)
+            subscribed_uuids.append(MOTION_UUID)
             print("Subscribed to accelerometer notifications.")
+            if self.shutdown_requested.is_set():
+                return
             
             # Subscribe to accelerometer notifications
             await self.client.start_notify(EEG_CONFIG_UUID, self.config_handler)
+            subscribed_uuids.append(EEG_CONFIG_UUID)
             print("Subscribed to accelerometer notifications.")
+            if self.shutdown_requested.is_set():
+                return
             
             # Subscribe to new characteristic notifications with asyncio.create_task
             await self.client.start_notify(
                 EEG_DATA_UUID,
                 lambda sender, data: asyncio.create_task(self.packet_handler(self.client, sender, data))
             )
+            subscribed_uuids.append(EEG_DATA_UUID)
             print("Subscribed to EEG data characteristic notifications.")
 
             await self.shutdown_event.wait()
 
             print(time()-start)
-        
-            await self.client.stop_notify(EEG_DATA_UUID)
-            await self.client.stop_notify(EVENT_UUID)
-            await self.client.stop_notify(MOTION_UUID)
-            await self.client.stop_notify(EEG_CONFIG_UUID)
             print("Finished")
             self.is_connected = False
         
         finally:
+            for uuid in reversed(subscribed_uuids):
+                if self.client and self.client.is_connected:
+                    try:
+                        await self.client.stop_notify(uuid)
+                    except Exception as e:
+                        print(f"[AlchemiacProxy.py] stop_notify failed for {uuid}: {e}")
             if self.client and self.client.is_connected:
                 await self.client.disconnect()
                 print("Disconnected from device.")

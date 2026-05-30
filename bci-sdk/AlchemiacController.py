@@ -75,11 +75,17 @@ def motion_callback(sample):
 
 # ─── Graceful shutdown ───────────────────────────────────────────────────────
 shutdown_event = Event()
+cleanup_started = False
 
 
 def _signal_handler(sig, frame):
-    print("\n[INFO] Ctrl+C received. Initiating shutdown...")
+    if cleanup_started:
+        print("\n[INFO] Shutdown already in progress...")
+        return
+    if not shutdown_event.is_set():
+        print("\n[INFO] Ctrl+C received. Initiating shutdown...")
     shutdown_event.set()
+    raise KeyboardInterrupt
 
 
 signal.signal(signal.SIGINT, _signal_handler)
@@ -94,6 +100,8 @@ def sleep_until_shutdown(seconds: float):
 # ─── BLE scanning & device selection ─────────────────────────────────────────
 async def _scan(timeout: float = SCAN_TIMEOUT) -> list:
     """Return likely Alchemiac BLE devices plus a macOS fallback candidate list."""
+    if shutdown_event.is_set():
+        return []
     addr_kind = "UUID" if OS == "Darwin" else "MAC address"
     print(f"\n[SCAN] Scanning for '{DEVICE_NAME}' ({timeout:.0f} s)  "
           f"[{OS} — using {addr_kind}]\n")
@@ -145,6 +153,8 @@ async def _scan(timeout: float = SCAN_TIMEOUT) -> list:
 
 def _select_device(devices: list):
     """Print a numbered menu and return the chosen BleakDevice."""
+    if shutdown_event.is_set():
+        return None
     addr_label = "UUID" if OS == "Darwin" else "Address"
     width = 86
     print("─" * width)
@@ -162,6 +172,8 @@ def _select_device(devices: list):
 
     while True:
         try:
+            if shutdown_event.is_set():
+                return None
             raw = input(f"\n  Select device [0–{len(devices) - 1}]: ").strip()
             idx = int(raw)
             if 0 <= idx < len(devices):
@@ -177,7 +189,11 @@ def scan_and_select() -> str:
     let the user choose, and return the address ready for BleakClient.
     """
     while True:
+        if shutdown_event.is_set():
+            sys.exit(0)
         devices = asyncio.run(_scan())
+        if shutdown_event.is_set():
+            sys.exit(0)
         if devices:
             break
         print(f"[SCAN] No '{DEVICE_NAME}' candidates found.")
@@ -188,6 +204,8 @@ def scan_and_select() -> str:
             sys.exit(0)
 
     chosen = _select_device(devices)
+    if chosen is None:
+        sys.exit(0)
     print(f"\n[INFO] Selected: {chosen.name}  ({chosen.address})\n")
     return chosen.address
 
@@ -200,7 +218,11 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
     # 1. Discover and select the device
-    device_address = scan_and_select()
+    try:
+        device_address = scan_and_select()
+    except KeyboardInterrupt:
+        print("[MAIN] Scan interrupted. Goodbye!")
+        sys.exit(130)
 
     # 2. Start the EEG visualizer in a separate process
     q = Queue()
@@ -213,7 +235,8 @@ if __name__ == "__main__":
         proxy = AlchemiacProxy(device_address,
                                eeg_callback=eeg_callback,
                                motion_callback=motion_callback)
-        proxy.waitForConnected()
+        if not proxy.waitForConnected(should_stop=shutdown_event.is_set):
+            raise KeyboardInterrupt
 
         # Brief stabilisation pause before the live demo
         print("Stabilising signal…")
@@ -229,6 +252,7 @@ if __name__ == "__main__":
         print("[MAIN] KeyboardInterrupt caught.")
 
     finally:
+        cleanup_started = True
         print("[MAIN] Cleaning up…")
         shutdown_event.set()
         if proxy is not None:
