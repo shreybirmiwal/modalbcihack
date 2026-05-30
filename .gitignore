@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+auto research/.venv/
+auto research/runs/
+web/node_modules/
+web/dist/
