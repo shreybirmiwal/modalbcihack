@@ -1,13 +1,13 @@
-# Subject: S03 | Stage: 2 actions (noop, jump)
+# Subject: S03 | Stage: 4 actions (nothing, left_squeeze, right_squeeze, eye_blink)
 
-GOAL: maximize closed-loop survival time in a small game by decoding causal EEG
-windows into controls.
+GOAL: decode causal Alchemiac EEG windows into nothing, left arm squeeze, right arm squeeze, and eye blink actions.
 
 CONSTRAINTS:
 - Use causal windows only; never read future frames.
 - Keep inference lightweight enough for live feedback.
 - Prefer <=8 channels.
-- Do not edit `prepare.py`; it owns data generation, splits, and evaluation.
+- Real production CSVs use marker=1 for the action named by the filename and
+  marker=0 for nothing.
 
 SEARCH PRIORITIES:
 1. Window crops and offsets.
@@ -17,9 +17,9 @@ SEARCH PRIORITIES:
 5. Temporal smoothing only when it improves closed-loop play.
 
 CURRICULUM:
-- Stage 2: noop, jump.
-- Stage 3: add left after stable survival improvement.
-- Stage 4: add right after stable survival improvement.
+- Stage 2: nothing and left_squeeze.
+- Stage 3: add right_squeeze.
+- Stage 4: add eye_blink.
 
 NOTES FOR AGENT:
 - Every candidate should have a short hypothesis.

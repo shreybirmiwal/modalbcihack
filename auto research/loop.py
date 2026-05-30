@@ -6,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from typing import Any
 import argparse
+import glob
 import hashlib
 import json
 import math
@@ -39,16 +40,22 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--sealed-probe-every", type=int, default=3)
     parser.add_argument("--gap-tolerance", type=float, default=0.18)
+    parser.add_argument("--data-path", action="append", default=[], help="Optional Alchemiac EEG CSV. Repeat for multiple files.")
+    parser.add_argument("--data-glob", action="append", default=[], help="Optional glob for discovering labeled production CSVs.")
     args = parser.parse_args()
 
     RUNS_DIR.mkdir(exist_ok=True)
+    data_path = resolve_data_specs(args.data_path, args.data_glob)
+    dataset_id = dataset_signature(args.subject, args.stage, data_path)
     program_text = load_program_text()
     program_hash = hashlib.sha256(program_text.encode("utf-8")).hexdigest()[:12]
-    tried = load_tried_signatures()
-    best_config, best_reward = load_best(args.subject, args.stage)
+    tried = load_tried_signatures(dataset_id)
+    best_config, best_reward = load_best(args.subject, args.stage, data_path)
 
     print(f"Autoresearch EEG loop | subject={args.subject} stage={args.stage}")
     print(f"program={PROGRAM_PATH} hash={program_hash} goal={extract_goal(program_text)}")
+    if data_path:
+        print(f"data_path={data_path_label(data_path)} dataset_id={dataset_id}")
     print(f"starting_best_reward={best_reward:.4f} tried={len(tried)}")
 
     for round_idx in range(1, args.rounds + 1):
@@ -63,7 +70,7 @@ def main() -> None:
         sealed = args.sealed_probe_every > 0 and round_idx % args.sealed_probe_every == 0
         print(f"\nround={round_idx} candidates={len(candidates)} sealed_probe={sealed}")
 
-        results = evaluate_candidates(candidates, args.subject, args.stage, args.workers, sealed, program_hash)
+        results = evaluate_candidates(candidates, args.subject, args.stage, args.workers, sealed, program_hash, data_path, dataset_id)
         accepted = False
         for result in sorted(results, key=lambda row: row["reward"], reverse=True):
             tried.add(result["signature"])
@@ -71,7 +78,7 @@ def main() -> None:
             if result["reward"] > best_reward and result["generalization_gap"] <= args.gap_tolerance:
                 best_reward = result["reward"]
                 best_config = result["config"]
-                save_best(best_config, best_reward, args.subject, args.stage, result)
+                save_best(best_config, best_reward, args.subject, args.stage, result, data_path, dataset_id)
                 accepted = True
                 print(
                     "accepted "
@@ -184,24 +191,36 @@ def evaluate_candidates(
     workers: int,
     sealed: bool,
     program_hash: str,
+    data_path: list[str] | None,
+    dataset_id: str,
 ) -> list[dict[str, Any]]:
     if workers <= 1:
-        return [_evaluate_one(candidate, subject, stage, sealed, program_hash) for candidate in candidates]
+        return [_evaluate_one(candidate, subject, stage, sealed, program_hash, data_path, dataset_id) for candidate in candidates]
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(_evaluate_one, candidate, subject, stage, sealed, program_hash) for candidate in candidates]
+        futures = [pool.submit(_evaluate_one, candidate, subject, stage, sealed, program_hash, data_path, dataset_id) for candidate in candidates]
         return [future.result() for future in as_completed(futures)]
 
 
-def _evaluate_one(candidate: Candidate, subject: str, stage: int, sealed: bool, program_hash: str) -> dict[str, Any]:
+def _evaluate_one(
+    candidate: Candidate,
+    subject: str,
+    stage: int,
+    sealed: bool,
+    program_hash: str,
+    data_path: list[str] | None,
+    dataset_id: str,
+) -> dict[str, Any]:
     started = time.time()
-    evaluation = evaluate_config(candidate.config, subject=subject, stage=stage, sealed=sealed)
-    experiments_seen = max(1, len(load_tried_signatures()))
+    evaluation = evaluate_config(candidate.config, subject=subject, stage=stage, sealed=sealed, data_path=data_path)
+    experiments_seen = max(1, len(load_tried_signatures(dataset_id)))
     multiple_comparison_penalty = 0.006 * math.log1p(experiments_seen)
     reward = evaluation.reward_base - 0.55 * evaluation.generalization_gap - multiple_comparison_penalty
     return {
         "timestamp": round(time.time(), 3),
         "subject": subject,
         "stage": stage,
+        "data_path": data_path_label(data_path),
+        "dataset_id": dataset_id,
         "program_hash": program_hash,
         "signature": candidate.signature,
         "hypothesis": candidate.hypothesis,
@@ -215,13 +234,15 @@ def _evaluate_one(candidate: Candidate, subject: str, stage: int, sealed: bool, 
     }
 
 
-def load_best(subject: str, stage: int) -> tuple[dict[str, Any], float]:
+def load_best(subject: str, stage: int, data_path: list[str] | None = None) -> tuple[dict[str, Any], float]:
+    dataset_id = dataset_signature(subject, stage, data_path)
     if BEST_PATH.exists():
         payload = json.loads(BEST_PATH.read_text())
-        if payload.get("subject") == subject and payload.get("stage") == stage:
+        payload_dataset = payload.get("dataset_id") or dataset_signature(subject, stage, None)
+        if payload.get("subject") == subject and payload.get("stage") == stage and payload_dataset == dataset_id:
             return payload["config"], float(payload["reward"])
     baseline = dict(BASE_CONFIG)
-    evaluation = evaluate_config(baseline, subject=subject, stage=stage, sealed=True)
+    evaluation = evaluate_config(baseline, subject=subject, stage=stage, sealed=True, data_path=data_path)
     reward = evaluation.reward_base - 0.55 * evaluation.generalization_gap
     save_best(
         baseline,
@@ -235,14 +256,26 @@ def load_best(subject: str, stage: int) -> tuple[dict[str, Any], float]:
             "sealed": asdict(evaluation.sealed) if evaluation.sealed else None,
             "generalization_gap": evaluation.generalization_gap,
         },
+        data_path,
+        dataset_id,
     )
     return baseline, reward
 
 
-def save_best(config: dict[str, Any], reward: float, subject: str, stage: int, result: dict[str, Any]) -> None:
+def save_best(
+    config: dict[str, Any],
+    reward: float,
+    subject: str,
+    stage: int,
+    result: dict[str, Any],
+    data_path: list[str] | None = None,
+    dataset_id: str | None = None,
+) -> None:
     payload = {
         "subject": subject,
         "stage": stage,
+        "data_path": data_path_label(data_path),
+        "dataset_id": dataset_id or dataset_signature(subject, stage, data_path),
         "reward": reward,
         "config": config,
         "accepted_from": result,
@@ -255,7 +288,7 @@ def append_log(result: dict[str, Any]) -> None:
         handle.write(json.dumps(result, sort_keys=True) + "\n")
 
 
-def load_tried_signatures() -> set[str]:
+def load_tried_signatures(dataset_id: str | None = None) -> set[str]:
     if not LOG_PATH.exists():
         return set()
     signatures = set()
@@ -263,7 +296,10 @@ def load_tried_signatures() -> set[str]:
         if not line.strip():
             continue
         try:
-            signatures.add(json.loads(line)["signature"])
+            row = json.loads(line)
+            if dataset_id is not None and row.get("dataset_id") != dataset_id:
+                continue
+            signatures.add(row["signature"])
         except (KeyError, json.JSONDecodeError):
             continue
     return signatures
@@ -285,6 +321,44 @@ def extract_goal(program_text: str) -> str:
 def config_signature(config: dict[str, Any]) -> str:
     canonical = json.dumps(config, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def resolve_data_specs(data_paths: list[str], data_globs: list[str]) -> list[str] | None:
+    resolved: list[str] = []
+    for value in data_paths:
+        resolved.extend(part.strip() for part in value.split(",") if part.strip())
+    for pattern in data_globs:
+        resolved.extend(sorted(glob.glob(pattern)))
+    if not resolved:
+        return None
+
+    deduped = []
+    seen = set()
+    for value in resolved:
+        key = str(Path(value).resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(value)
+    return deduped
+
+
+def data_path_label(data_path: list[str] | None) -> list[str] | None:
+    if not data_path:
+        return None
+    return [str(Path(path).resolve()) for path in data_path]
+
+
+def dataset_signature(subject: str, stage: int, data_path: list[str] | None = None) -> str:
+    if not data_path:
+        return f"synthetic:{subject}:{stage}"
+    parts = []
+    for value in data_path:
+        path = Path(value).resolve()
+        stat = path.stat()
+        parts.append(f"{path}:{stat.st_size}:{stat.st_mtime_ns}")
+    text = f"csv:{subject}:stage={stage}:" + "|".join(sorted(parts))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def stable_seed(*parts: object) -> int:

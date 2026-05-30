@@ -1,0 +1,101 @@
+{
+  "accepted_from": {
+    "config": {
+      "channels": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "clip": 3.0,
+      "epochs": 18,
+      "features": [
+        "mean",
+        "std",
+        "energy",
+        "mu",
+        "beta"
+      ],
+      "l2": 0.0002,
+      "learning_rate": 0.025,
+      "model": "softmax",
+      "smooth": 1,
+      "window_size": 32,
+      "window_start": 0
+    },
+    "cv": {
+      "balanced_accuracy": 0.4583333333333333,
+      "closed_loop_score": 1.3732127889267565,
+      "latency_cost": 0.001,
+      "macro_f1": 0.24892684414147037
+    },
+    "data_path": [
+      "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/blink_prod.csv",
+      "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/blink_prod2.csv",
+      "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/left_prod.csv",
+      "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/left_prod2.csv",
+      "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/right_prod.csv",
+      "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/right_prod2.csv"
+    ],
+    "dataset_id": "bff1f19f7ffc2eb6",
+    "generalization_gap": 0.07706274040128402,
+    "heldout": {
+      "balanced_accuracy": 0.25,
+      "closed_loop_score": 1.337906249999987,
+      "latency_cost": 0.001,
+      "macro_f1": 0.24803149606299213
+    },
+    "hypothesis": "tune optimizer pressure for small noisy EEG folds",
+    "program_hash": "2886d277e4b9",
+    "reward": 1.3661660093022203,
+    "sealed": null,
+    "seconds": 4.499,
+    "signature": "5a6dd555fcc46a9e",
+    "stage": 4,
+    "subject": "S03",
+    "timestamp": 1780183733.247
+  },
+  "config": {
+    "channels": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "clip": 3.0,
+    "epochs": 18,
+    "features": [
+      "mean",
+      "std",
+      "energy",
+      "mu",
+      "beta"
+    ],
+    "l2": 0.0002,
+    "learning_rate": 0.025,
+    "model": "softmax",
+    "smooth": 1,
+    "window_size": 32,
+    "window_start": 0
+  },
+  "data_path": [
+    "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/blink_prod.csv",
+    "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/blink_prod2.csv",
+    "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/left_prod.csv",
+    "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/left_prod2.csv",
+    "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/right_prod.csv",
+    "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/right_prod2.csv"
+  ],
+  "dataset_id": "bff1f19f7ffc2eb6",
+  "reward": 1.3661660093022203,
+  "stage": 4,
+  "subject": "S03"
+}

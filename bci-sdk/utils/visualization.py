@@ -16,7 +16,7 @@ def butter_bandpass(lowcut, highcut, fs, order=4):
     return butter(order, [low, high], btype='band')
 
 
-def visualizer(queue: Queue, marker_queue=None, marker_flag=None, shutdown_event=None,
+def visualizer(queue: Queue, marker_counter=None, marker_queue=None, marker_flag=None, shutdown_event=None,
                nbChannels=8, samplingRate=250,
                apply_filter=True, lowcut=15, highcut=30.0, order=2,
                display_channels=None):
@@ -75,6 +75,8 @@ def visualizer(queue: Queue, marker_queue=None, marker_flag=None, shutdown_event
                                pen=pg.mkPen('r', width=2, style=QtCore.Qt.DashLine))
         plot.addItem(line)
         marker_lines.append(line)
+        if marker_counter is not None:
+            marker_counter.value += 1
         if marker_queue is not None:
             marker_queue.put(1)
         if marker_flag is not None:

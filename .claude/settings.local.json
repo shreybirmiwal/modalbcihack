@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(uv run:*)",
+      "Bash(grep \",1$\" data/alchemiac_eeg_2026-05-30_14-23-28.csv)",
+      "Bash(find /Users/shreybirmiwal/projects/modalhack/bci-sdk -name \"__pycache__\" -type d -exec rm -rf {} +)",
+      "Bash(find . -name \"__pycache__\" -exec rm -rf {} +)"
+    ]
+  }
+}

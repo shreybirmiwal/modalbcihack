@@ -67,6 +67,28 @@ def predict(model: Model, examples: list[Any], config: dict[str, Any] | None = N
     return _smooth_predictions(predictions, smooth)
 
 
+def model_to_payload(model: Model) -> dict[str, Any]:
+    return {
+        "config": model.config,
+        "means": model.means,
+        "scales": model.scales,
+        "kind": model.kind,
+        "weights": model.weights,
+        "centroids": model.centroids,
+    }
+
+
+def model_from_payload(payload: dict[str, Any]) -> Model:
+    return Model(
+        config=dict(payload["config"]),
+        means=[float(value) for value in payload["means"]],
+        scales=[float(value) for value in payload["scales"]],
+        kind=str(payload["kind"]),
+        weights=[[float(value) for value in row] for row in payload.get("weights", [])],
+        centroids=[[float(value) for value in row] for row in payload.get("centroids", [])],
+    )
+
+
 def _features(window: list[list[float]], config: dict[str, Any]) -> list[float]:
     selected_channels = list(config.get("channels", CONFIG["channels"]))
     start = int(config.get("window_start", 0))
