@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
     # 2. Start the EEG visualizer in a separate process
     q = Queue()
-    vis_process = Process(target=visualizer, args=(q,))
+    vis_process = Process(target=visualizer, args=(q,), kwargs={"display_channels": [0, 1, 2]})
     vis_process.start()
 
     proxy = None
