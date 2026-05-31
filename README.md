@@ -29,6 +29,48 @@ this means we need 1 wet electrode on left arm, 1 wet electrode on right arm, 1 
 stream data from electrodes using:https://github.com/fs-re-ak/AlchemiacPythonSDK#
 forwards data to lsl
 
+### live game inference
+
+The live demo uses the Modal/autoresearch model exported at
+`auto research/runs/final_model.json`.
+
+Start the headset stream in one terminal:
+
+```bash
+cd bci-sdk
+uv run AlchemiacStreamLSL.py
+```
+
+Then start the live inference game controller in another terminal:
+
+```bash
+cd bci-sdk
+uv run AlchemiacGameController.py
+```
+
+The game controller keeps the wave visualizer on the left and shows game tabs
+on the right:
+
+- Flappy Bird: `eye_blink` flaps. Space is a keyboard fallback.
+- Pong: `right_squeeze` moves the paddle up, `left_squeeze` moves it down.
+- Crossy Road: `left_squeeze` moves forward.
+- Geometry Dash: `right_squeeze` jumps.
+
+You can test without the headset by replaying a saved CSV through the same
+model and game path:
+
+```bash
+cd bci-sdk
+uv run AlchemiacGameController.py --replay-csv data/blink_prod.csv
+```
+
+The older recorder is still available when you only want CSV capture and wave
+marking:
+
+```bash
+uv run AlchemiacController.py
+```
+
 
 # hackathon details
 this is the modal autoresearch hackathon

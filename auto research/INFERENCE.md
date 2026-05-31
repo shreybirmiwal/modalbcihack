@@ -55,6 +55,20 @@ Use the same channel order as the Alchemiac CSV header:
 AF8, AF7, CHEEK_R, CHEEK_L, EAR_R, AFz, BROW_L, NOSE
 ```
 
+For the MacBook live demo, use the BCI game controller in `bci-sdk/`:
+
+```bash
+cd ../bci-sdk
+uv run AlchemiacStreamLSL.py
+uv run AlchemiacGameController.py
+```
+
+To replay saved data through the same live inference/game path:
+
+```bash
+uv run AlchemiacGameController.py --replay-csv data/blink_prod.csv
+```
+
 ## Retraining With New Files
 
 Drop new labeled recordings into `bci-sdk/data/` with names like:

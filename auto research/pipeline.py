@@ -23,6 +23,7 @@ CONFIG: dict[str, Any] = {
     "learning_rate": 0.065,
     "l2": 0.0005,
     "smooth": 1,
+    "class_weight": "sqrt_balanced",
 }
 
 
@@ -173,6 +174,7 @@ def _train_perceptron(rows: list[list[float]], labels: list[int], action_count: 
     weights = [[0.0] * (width + 1) for _ in range(action_count)]
     lr = float(config.get("learning_rate", 0.05))
     epochs = int(config.get("epochs", 12))
+    label_weights = _class_weights(labels, action_count, config)
     order = list(range(len(rows)))
     rng = random.Random(7)
     for _ in range(epochs):
@@ -180,13 +182,14 @@ def _train_perceptron(rows: list[list[float]], labels: list[int], action_count: 
         for row_idx in order:
             row = rows[row_idx]
             label = labels[row_idx]
+            sample_weight = label_weights[label]
             pred = _argmax(_linear_scores(weights, row))
             if pred != label:
                 for idx, value in enumerate(row):
-                    weights[label][idx] += lr * value
-                    weights[pred][idx] -= lr * value
-                weights[label][-1] += lr
-                weights[pred][-1] -= lr
+                    weights[label][idx] += lr * sample_weight * value
+                    weights[pred][idx] -= lr * sample_weight * value
+                weights[label][-1] += lr * sample_weight
+                weights[pred][-1] -= lr * sample_weight
     return weights
 
 
@@ -196,6 +199,7 @@ def _train_softmax(rows: list[list[float]], labels: list[int], action_count: int
     lr = float(config.get("learning_rate", 0.05))
     l2 = float(config.get("l2", 0.0))
     epochs = int(config.get("epochs", 20))
+    label_weights = _class_weights(labels, action_count, config)
     order = list(range(len(rows)))
     rng = random.Random(11)
 
@@ -204,13 +208,32 @@ def _train_softmax(rows: list[list[float]], labels: list[int], action_count: int
         for row_idx in order:
             row = rows[row_idx]
             label = labels[row_idx]
+            sample_weight = label_weights[label]
             scores = _linear_scores(weights, row)
             probs = _softmax(scores)
             for action, prob in enumerate(probs):
-                gradient = prob - (1.0 if action == label else 0.0)
+                gradient = sample_weight * (prob - (1.0 if action == label else 0.0))
                 for idx, value in enumerate(row):
                     weights[action][idx] -= lr * (gradient * value + l2 * weights[action][idx])
                 weights[action][-1] -= lr * gradient
+    return weights
+
+
+def _class_weights(labels: list[int], action_count: int, config: dict[str, Any]) -> list[float]:
+    mode = str(config.get("class_weight", "none"))
+    if mode in {"", "none", "0", "false"}:
+        return [1.0] * action_count
+    counts = [0] * action_count
+    for label in labels:
+        counts[label] += 1
+    total = max(1, len(labels))
+    exponent = 0.5 if mode == "sqrt_balanced" else 1.0
+    weights = []
+    for count in counts:
+        if count == 0:
+            weights.append(1.0)
+            continue
+        weights.append((total / (action_count * count)) ** exponent)
     return weights
 
 
