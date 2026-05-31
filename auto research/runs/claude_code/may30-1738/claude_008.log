@@ -1,0 +1,5 @@
+Reward: **1.450252** — matches the current best.
+
+The change helped: heldout_score improved from 1.335966 → 1.346264, and macro_f1 jumped from 0.331 → 0.373 (13% improvement), indicating better action class recall. The generalization gap remains 0.
+
+The `threshold_percentile` reduction from 0.995 → 0.975 tied the best known reward by making the detectors less conservative, which is consistent with the scoring asymmetry: missing an action costs 1.25 while false-alarming costs only 0.70.

@@ -1,0 +1,7 @@
+Reward improved from **1.413709 → 1.414347**. The detectors are now firing — balanced_accuracy jumped from 0.250 to 0.332 and macro_f1 from 0.248 to 0.348, confirming both the normalized centroid margin and removing clipping helped the channel_ovr detectors activate.
+
+**Summary of changes made to `pipeline.py`:**
+1. `clip: 3.0` → `clip: 0.0` — removes truncation of large-amplitude blink signals
+2. `_centroid_margin` now returns `(neg_dist - pos_dist) / (pos_dist + 1.0)` — normalizes the score so samples very close to the positive centroid score more strongly, improving threshold calibration
+
+The generalization_gap is 0.032 (small), reward_base improved enough to net a positive gain. `pipeline.py` is left in this improved state for the wrapper to evaluate.

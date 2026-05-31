@@ -1,0 +1,67 @@
+{
+  "strategy": "adaptive_envelope",
+  "description": "Computes the analytic envelope via Hilbert-like approximation (abs of signal after subtracting a 15-sample moving average to remove DC). The envelope is then smoothed with an exponential moving average (alpha=0.15). An adaptive baseline tracks the 20th percentile of the envelope over a 256-sample history, and the score is the ratio of current envelope to adaptive baseline. This makes the detector self-calibrating to changing impedance.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 2,
+    "score_method": "adaptive_envelope",
+    "dc_removal_window": 15,
+    "ema_alpha": 0.15,
+    "baseline_history_samples": 256,
+    "baseline_percentile": 20,
+    "normalization": "adaptive_baseline"
+  },
+  "model": {
+    "kind": "adaptive_envelope",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 2,
+      "score_method": "adaptive_envelope",
+      "dc_removal_window": 15,
+      "ema_alpha": 0.15,
+      "baseline_history_samples": 256,
+      "baseline_percentile": 20
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 1.034,
+        "mad": 0.221,
+        "threshold": 5.87,
+        "adaptive_baseline_uv": 0.018,
+        "min_envelope_ratio": 3.0
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 1.192,
+        "mad": 0.408,
+        "threshold": 4.21,
+        "adaptive_baseline_uv": 0.073,
+        "min_envelope_ratio": 2.5
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 1.0,
+        "mad": 1.0,
+        "threshold": 3.89,
+        "adaptive_baseline_uv": 0.0,
+        "min_envelope_ratio": 4.0
+      }
+    ]
+  },
+  "notes": "Self-calibrating to impedance drift via adaptive baseline. The DC-removal step prevents slow electrode polarization from inflating the envelope. EMA smoothing reduces jitter in the envelope estimate. Lower thresholds than spike model because the envelope ratio is already normalized."
+}

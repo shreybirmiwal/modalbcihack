@@ -1,0 +1,67 @@
+{
+  "strategy": "zero_crossing_hybrid",
+  "description": "Combines zero-crossing rate (ZCR) with RMS energy. Muscle artifacts and squeezes increase both ZCR and energy simultaneously, while slow drift increases energy but not ZCR. The hybrid score is sqrt(zcr_normalized * energy_normalized), requiring both components to be elevated. A Schmitt trigger hysteresis prevents rapid toggling near threshold.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 3,
+    "score_method": "zero_crossing_hybrid",
+    "zcr_weight": 0.5,
+    "energy_weight": 0.5,
+    "hysteresis_on": 1.0,
+    "hysteresis_off": 0.7,
+    "normalization": "zscore_rolling_512"
+  },
+  "model": {
+    "kind": "zero_crossing_hybrid",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 3,
+      "score_method": "zero_crossing_hybrid",
+      "zcr_weight": 0.5,
+      "energy_weight": 0.5,
+      "hysteresis_on": 1.0,
+      "hysteresis_off": 0.7
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.1127,
+        "mad": 0.0834,
+        "threshold": 25.41,
+        "zcr_baseline": 0.31,
+        "energy_baseline_uv2": 0.042
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 0.4891,
+        "mad": 0.3217,
+        "threshold": 13.08,
+        "zcr_baseline": 0.28,
+        "energy_baseline_uv2": 0.189
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 8.55,
+        "zcr_baseline": 0.15,
+        "energy_baseline_uv2": 0.0
+      }
+    ]
+  },
+  "notes": "The geometric mean of ZCR and energy acts as an AND gate: both must spike for the score to rise. This rejects drift artifacts (high energy, low ZCR) and high-frequency sensor noise (high ZCR, low energy). Schmitt hysteresis prevents chatter near the decision boundary."
+}

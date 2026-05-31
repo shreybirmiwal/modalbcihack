@@ -1,0 +1,62 @@
+{
+  "strategy": "derivative_transient",
+  "description": "Computes the first-order finite difference of the raw signal, squares it, and applies a 5-sample boxcar smooth. Transient spikes from squeezes and blinks produce sharp derivative peaks that stand out from slow drift. A dead-zone clips derivatives below 1 std of the training baseline to suppress sensor noise.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 1,
+    "score_method": "derivative_transient",
+    "diff_order": 1,
+    "boxcar_width": 5,
+    "deadzone_std_multiplier": 1.0,
+    "normalization": "median_mad"
+  },
+  "model": {
+    "kind": "derivative_transient",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 1,
+      "score_method": "derivative_transient",
+      "diff_order": 1,
+      "boxcar_width": 5,
+      "deadzone_std_multiplier": 1.0
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.0412,
+        "mad": 0.0283,
+        "threshold": 31.88,
+        "deadzone_floor": 0.0283
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 0.1934,
+        "mad": 0.1102,
+        "threshold": 19.45,
+        "deadzone_floor": 0.1102
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 11.22,
+        "deadzone_floor": 0.0
+      }
+    ]
+  },
+  "notes": "Derivative-based scoring is inherently drift-invariant since differencing removes DC offset. The deadzone suppresses low-amplitude sensor noise that produces false derivative spikes. Works well for impulsive actions but may miss slow sustained squeezes."
+}

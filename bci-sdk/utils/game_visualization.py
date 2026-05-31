@@ -137,6 +137,9 @@ class FlappyBirdGame(GameCanvas):
         if key == QtCore.Qt.Key_Space:
             self.flap()
 
+    def handle_mouse(self):
+        self.flap()
+
     def flap(self):
         if not self.alive:
             self.reset()
@@ -410,7 +413,10 @@ class GeometryDashGame(GameCanvas):
     def handle_key(self, key: int):
         super().handle_key(key)
         if key == QtCore.Qt.Key_Space:
-            self.handle_action("right_squeeze")
+            self.handle_action("eye_blink")
+
+    def handle_mouse(self):
+        self.handle_action("eye_blink")
 
     def step(self):
         ground = GAME_HEIGHT - 70
@@ -551,7 +557,7 @@ def game_visualizer(
         return QtGui.QKeySequence(key).toString() or str(key)
 
     def mapped_control(game, action: str) -> str:
-        if isinstance(game, FlappyBirdGame) and action in {"eye_blink", "left_squeeze", "right_squeeze", "Space"}:
+        if isinstance(game, FlappyBirdGame) and action in {"eye_blink", "left_squeeze", "right_squeeze", "Space", "MouseLeft"}:
             return "Flappy Bird: flap"
         if isinstance(game, PongGame):
             if action in {"right_squeeze", "Up"}:
@@ -560,7 +566,7 @@ def game_visualizer(
                 return "Pong: paddle down"
         if isinstance(game, CrossyRoadGame) and action in {"left_squeeze", "Space", "Up"}:
             return "Crossy Road: hop forward"
-        if isinstance(game, GeometryDashGame) and action in {"eye_blink", "Space"}:
+        if isinstance(game, GeometryDashGame) and action in {"eye_blink", "Space", "MouseLeft"}:
             return "Geometry Dash: jump"
         if action == "R":
             return "Reset active game"
@@ -583,14 +589,26 @@ def game_visualizer(
         if key == QtCore.Qt.Key_Space:
             add_marker()
 
+    def handle_mouse_click():
+        game = active_game()
+        input_label.setText("Last input: mouse click")
+        control_label.setText(f"Mapped control: {mapped_control(game, 'MouseLeft')}")
+        if hasattr(game, "handle_mouse"):
+            game.handle_mouse()
+
     class KeyFilter(QtCore.QObject):
         def eventFilter(self, obj, event):
             if event.type() == QtCore.QEvent.KeyPress and not event.isAutoRepeat():
                 handle_manual_key(event.key())
                 return True
+            if event.type() == QtCore.QEvent.MouseButtonPress:
+                if event.button() == QtCore.Qt.LeftButton:
+                    handle_mouse_click()
+                    return True
             return False
 
     key_filter = KeyFilter(main_widget)
+    app.installEventFilter(key_filter)
     main_widget.installEventFilter(key_filter)
 
     def rebuild_curves():

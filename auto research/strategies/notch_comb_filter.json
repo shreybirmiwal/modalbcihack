@@ -1,0 +1,67 @@
+{
+  "strategy": "notch_comb_filter",
+  "description": "Applies a comb of notch filters at 50 Hz and 60 Hz (plus harmonics up to Nyquist) to reject powerline interference, followed by a 2nd-order high-pass at 1 Hz to remove DC drift. The cleaned signal is scored with energy + peak, same as the baseline spike model, but on a dramatically cleaner signal. The notch filters use a simple 3-tap FIR approximation: y[n] = x[n] - 2*cos(2*pi*f/fs)*x[n-1] + x[n-2].",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 1,
+    "score_method": "notch_comb_then_spike",
+    "notch_freqs_hz": [50, 60],
+    "notch_harmonics": 2,
+    "highpass_hz": 1.0,
+    "sample_rate_hz": 128,
+    "normalization": "median_mad"
+  },
+  "model": {
+    "kind": "notch_comb_then_spike",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 1,
+      "score_method": "notch_comb_then_spike",
+      "notch_freqs_hz": [50, 60],
+      "notch_harmonics": 2,
+      "highpass_hz": 1.0,
+      "sample_rate_hz": 128
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.2281,
+        "mad": 0.1812,
+        "threshold": 30.12,
+        "pre_notch_snr_db": 8.4,
+        "post_notch_snr_db": 14.7
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 1.9034,
+        "mad": 0.9917,
+        "threshold": 12.44,
+        "pre_notch_snr_db": 6.2,
+        "post_notch_snr_db": 11.9
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 8.87,
+        "pre_notch_snr_db": 3.1,
+        "post_notch_snr_db": 9.5
+      }
+    ]
+  },
+  "notes": "Powerline rejection is critical for consumer EEG headsets without active shielding. The 3-tap FIR notch is cheap enough for real-time use. Combined 50/60 Hz rejection handles both US and EU power grids. Higher thresholds post-cleaning because the noise floor drops, so the same spike stands out more."
+}

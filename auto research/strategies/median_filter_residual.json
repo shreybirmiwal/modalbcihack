@@ -1,0 +1,60 @@
+{
+  "strategy": "median_filter_residual",
+  "description": "Runs a sliding median filter (kernel=7) over each channel, then subtracts the filtered signal from the raw signal to produce a residual. The residual isolates sharp transients that the median filter cannot track. The score is the L2 norm of the residual divided by the L2 norm of the filtered signal, giving a transient-to-baseline ratio.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 1,
+    "score_method": "median_filter_residual",
+    "median_kernel": 7,
+    "min_baseline_energy": 1e-6,
+    "normalization": "median_mad"
+  },
+  "model": {
+    "kind": "median_filter_residual",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 1,
+      "score_method": "median_filter_residual",
+      "median_kernel": 7,
+      "min_baseline_energy": 1e-6
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.2218,
+        "mad": 0.1503,
+        "threshold": 18.77,
+        "residual_energy_floor": 0.001
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 0.8914,
+        "mad": 0.5502,
+        "threshold": 9.34,
+        "residual_energy_floor": 0.005
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 7.12,
+        "residual_energy_floor": 0.0
+      }
+    ]
+  },
+  "notes": "Median filters are nonlinear and preserve edges while removing Gaussian noise. The residual captures exactly what the filter rejected: sharp spikes and transients. The ratio score normalizes by baseline activity so it works across varying impedance conditions."
+}

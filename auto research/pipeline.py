@@ -16,8 +16,8 @@ CONFIG: dict[str, Any] = {
     "channels": [0, 1, 2, 3, 4, 5, 6, 7],
     "window_start": 0,
     "window_size": 32,
-    "features": ["mean", "std", "energy", "mu", "beta", "peak", "kurtosis", "slope"],
-    "clip": 3.0,
+    "features": ["mean", "std", "energy", "mu", "beta", "peak", "kurtosis", "slope", "zero_cross", "crest"],
+    "clip": 0.0,
     "model": "centroid",
     "epochs": 18,
     "learning_rate": 0.065,
@@ -198,6 +198,13 @@ def _features(window: list[list[float]], config: dict[str, Any]) -> list[float]:
                 vector.append(m4 / (m2 * m2 + 1e-9))
             else:
                 vector.append(0.0)
+        if "zero_cross" in feature_names:
+            zc = sum(1 for i in range(1, len(samples)) if (samples[i - 1] >= 0) != (samples[i] >= 0))
+            vector.append(zc / max(1, len(samples) - 1))
+        if "crest" in feature_names:
+            rms = math.sqrt(variance + 1e-9)
+            peak_val = max(abs(value) for value in samples)
+            vector.append(peak_val / (rms + 1e-9))
 
     if "global_energy" in feature_names:
         all_samples = [value for channel in selected_channels for value in window[channel][start : start + size]]
@@ -360,7 +367,7 @@ def _binary_centroid(rows: list[list[float]], labels: list[int], target: int) ->
 def _centroid_margin(row: list[float], positive_centroid: list[float], negative_centroid: list[float]) -> float:
     positive_distance = sum((value - positive_centroid[idx]) ** 2 for idx, value in enumerate(row))
     negative_distance = sum((value - negative_centroid[idx]) ** 2 for idx, value in enumerate(row))
-    return negative_distance - positive_distance
+    return (negative_distance - positive_distance) / (positive_distance + 1.0)
 
 
 def _action_channels(config: dict[str, Any]) -> dict[int, list[int]]:

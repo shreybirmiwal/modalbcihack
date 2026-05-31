@@ -1,0 +1,5 @@
+Reward improved: **1.412709** > previous best of **1.406824**.
+
+Adding `slope` to the features helped (+0.006 reward). The `slope` feature captures the temporal ramp-up of muscle contractions, improving centroid separability in feature space. No generalization gap remains zero, confirming no overfitting.
+
+The final `pipeline.py` now includes `"slope"` in the features list and is left in this improved state.

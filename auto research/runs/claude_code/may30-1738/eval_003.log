@@ -1,0 +1,10 @@
+---
+reward:             1.413709
+heldout_score:      1.338906
+balanced_accuracy:  0.250000
+macro_f1:           0.248031
+generalization_gap: 0.000000
+training_seconds:   5.8
+dataset_id:         bff1f19f7ffc2eb6
+stage:              4
+final_model_path:   runs/final_model.json

@@ -1,0 +1,65 @@
+{
+  "strategy": "haar_wavelet_detail",
+  "description": "Performs a 3-level Haar wavelet decomposition by iterated pairwise averaging (approximation) and differencing (detail). The score is the sum of squared detail coefficients at levels 2 and 3, which capture transients in the 16-32 Hz and 8-16 Hz bands respectively at 128 Hz sampling. Level 1 detail (32-64 Hz) is discarded as it is dominated by EMG noise. A soft-thresholding step zeros out detail coefficients below a learned noise floor.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 1,
+    "score_method": "haar_wavelet_detail",
+    "wavelet_levels": 3,
+    "use_detail_levels": [2, 3],
+    "soft_threshold_lambda": 0.08,
+    "normalization": "median_mad"
+  },
+  "model": {
+    "kind": "haar_wavelet_detail",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 1,
+      "score_method": "haar_wavelet_detail",
+      "wavelet_levels": 3,
+      "use_detail_levels": [2, 3],
+      "soft_threshold_lambda": 0.08
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.0033,
+        "mad": 0.0021,
+        "threshold": 55.2,
+        "noise_floor_d2": 0.0012,
+        "noise_floor_d3": 0.0008
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 0.0187,
+        "mad": 0.0139,
+        "threshold": 28.7,
+        "noise_floor_d2": 0.0051,
+        "noise_floor_d3": 0.0034
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 18.3,
+        "noise_floor_d2": 0.0,
+        "noise_floor_d3": 0.0
+      }
+    ]
+  },
+  "notes": "Haar wavelets are trivially cheap (just add/subtract pairs) and provide time-frequency localization. Discarding level 1 removes high-frequency EMG contamination. Soft thresholding implements wavelet denoising ala Donoho-Johnstone. Higher thresholds needed because the wavelet detail energy is much smaller scale than raw spike scores."
+}

@@ -1,0 +1,65 @@
+{
+  "strategy": "bandpass_energy",
+  "description": "Applies a 4th-order Butterworth bandpass (8-30 Hz) to isolate mu/beta rhythms, then computes per-channel energy in the passband. Squeeze actions produce desynchronization bursts in AF7/AF8 that spike the band energy above baseline.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 64,
+    "window_start": 0,
+    "smooth": 2,
+    "bandpass_low_hz": 8,
+    "bandpass_high_hz": 30,
+    "filter_order": 4,
+    "score_method": "bandpass_energy",
+    "normalization": "zscore_rolling_256"
+  },
+  "model": {
+    "kind": "bandpass_energy",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 64,
+      "window_start": 0,
+      "smooth": 2,
+      "bandpass_low_hz": 8,
+      "bandpass_high_hz": 30,
+      "filter_order": 4,
+      "score_method": "bandpass_energy"
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.3821,
+        "mad": 0.1947,
+        "threshold": 14.223,
+        "passband_floor_uv2": 0.05,
+        "reject_if_broadband_ratio_below": 1.8
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 1.7603,
+        "mad": 0.8821,
+        "threshold": 8.491,
+        "passband_floor_uv2": 0.12,
+        "reject_if_broadband_ratio_below": 1.5
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 6.774,
+        "passband_floor_uv2": 0.0,
+        "reject_if_broadband_ratio_below": 0.0
+      }
+    ]
+  },
+  "notes": "Bandpass isolates motor-related mu desync. Broadband ratio gate rejects muscle artifacts that leak wideband energy. 64-sample window gives ~0.5s at 128 Hz for better frequency resolution."
+}

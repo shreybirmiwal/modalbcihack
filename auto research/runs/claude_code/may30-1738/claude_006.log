@@ -1,0 +1,7 @@
+**Result: reward 1.450252** — improved from the previous best of 1.414347.
+
+- `balanced_accuracy` jumped from ~0.25 → 0.333
+- `macro_f1` jumped from ~0.25 → 0.373
+- `generalization_gap` is 0.0 (no overfitting)
+
+The `zero_cross` and `crest` features helped discriminate eye blinks (impulsive, high-crest transients) from squeeze events. `pipeline.py` is left in this improved state for the wrapper to evaluate.

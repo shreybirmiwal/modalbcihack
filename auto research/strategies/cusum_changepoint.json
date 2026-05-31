@@ -1,0 +1,65 @@
+{
+  "strategy": "cusum_changepoint",
+  "description": "Applies a CUSUM (Cumulative Sum) changepoint detector to each channel. The algorithm accumulates positive deviations from the running mean: S[n] = max(0, S[n-1] + x[n] - mu - drift). When S exceeds a threshold h, a changepoint (action onset) is declared. The drift parameter controls sensitivity: lower drift catches smaller changes but increases false alarms. After detection, S is reset to zero. This is a classical sequential analysis method from industrial quality control adapted for EEG.",
+  "actions": ["nothing", "left_squeeze", "right_squeeze", "eye_blink"],
+  "config": {
+    "action_channels": { "1": [1], "2": [0], "3": [2] },
+    "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+    "window_size": 32,
+    "window_start": 0,
+    "smooth": 1,
+    "score_method": "cusum_changepoint",
+    "normalization": "zscore_rolling_256"
+  },
+  "model": {
+    "kind": "cusum_changepoint",
+    "means": [],
+    "scales": [],
+    "weights": [],
+    "centroids": [],
+    "config": {
+      "action_channels": { "1": [1], "2": [0], "3": [2] },
+      "channels": [0, 1, 2, 3, 4, 5, 6, 7],
+      "window_size": 32,
+      "window_start": 0,
+      "smooth": 1,
+      "score_method": "cusum_changepoint"
+    },
+    "detectors": [
+      {
+        "label": 1,
+        "channel": 1,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 4.2,
+        "cusum_drift": 0.5,
+        "cusum_h": 4.2,
+        "arl0_estimate": 312,
+        "running_mean_window": 128
+      },
+      {
+        "label": 2,
+        "channel": 0,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 3.8,
+        "cusum_drift": 0.4,
+        "cusum_h": 3.8,
+        "arl0_estimate": 278,
+        "running_mean_window": 128
+      },
+      {
+        "label": 3,
+        "channel": 2,
+        "median": 0.0,
+        "mad": 1.0,
+        "threshold": 5.5,
+        "cusum_drift": 0.8,
+        "cusum_h": 5.5,
+        "arl0_estimate": 891,
+        "running_mean_window": 128
+      }
+    ]
+  },
+  "notes": "CUSUM is optimal for detecting mean shifts under Gaussian assumptions (Moustakides 1986). The ARL0 (Average Run Length under null) estimates the expected samples between false alarms. Higher drift for blinks because their onset is sharper and larger. Running mean window of 128 samples (1 second at 128 Hz) tracks slow non-stationarity."
+}
