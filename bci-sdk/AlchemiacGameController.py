@@ -53,12 +53,19 @@ def _publish_inference(inference: BCIActionInference, samples: np.ndarray, actio
         print(f"[ACTION] {payload['action']} @ sample={payload['sample_index']}", flush=True)
 
 
-def run_live(queue: Queue, action_queue: Queue, marker_counter, model_path: Path, chunk_size: int):
+def run_live(
+    queue: Queue,
+    action_queue: Queue,
+    marker_counter,
+    model_path: Path,
+    chunk_size: int,
+    cooldown_samples: int,
+):
     DATA_DIR.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     eeg_path = DATA_DIR / f"alchemiac_game_eeg_{timestamp}.csv"
     inlet = _resolve_eeg_stream()
-    inference = BCIActionInference(model_path=model_path)
+    inference = BCIActionInference(model_path=model_path, cooldown_samples=cooldown_samples)
 
     first_lsl_timestamp = None
     last_marker_count = 0
@@ -103,8 +110,16 @@ def run_live(queue: Queue, action_queue: Queue, marker_counter, model_path: Path
     print(f"\n[DATA] {eeg_path.resolve()}  ({rows_written} samples)")
 
 
-def run_replay(queue: Queue, action_queue: Queue, model_path: Path, replay_csv: Path, chunk_size: int, sampling_rate: int):
-    inference = BCIActionInference(model_path=model_path)
+def run_replay(
+    queue: Queue,
+    action_queue: Queue,
+    model_path: Path,
+    replay_csv: Path,
+    chunk_size: int,
+    sampling_rate: int,
+    cooldown_samples: int,
+):
+    inference = BCIActionInference(model_path=model_path, cooldown_samples=cooldown_samples)
     print(f"[MODEL] {model_path}")
     print(f"[REPLAY] {replay_csv}")
     print("[INFO] Replaying CSV through the same live inference and game path.")
@@ -142,6 +157,7 @@ def parse_args():
     parser.add_argument("--replay-csv", default="", help="Optional CSV to replay instead of reading LSL.")
     parser.add_argument("--chunk-size", type=int, default=32)
     parser.add_argument("--sampling-rate", type=int, default=250)
+    parser.add_argument("--cooldown-seconds", type=float, default=2.0, help="Minimum seconds between emitted BCI actions.")
     return parser.parse_args()
 
 
@@ -154,6 +170,7 @@ if __name__ == "__main__":
     args = parse_args()
     model_path = Path(args.model).expanduser().resolve()
     replay_csv = Path(args.replay_csv).expanduser().resolve() if args.replay_csv else None
+    cooldown_samples = max(1, int(args.cooldown_seconds * args.sampling_rate))
 
     q = Queue()
     action_q = Queue()
@@ -174,9 +191,9 @@ if __name__ == "__main__":
 
     try:
         if replay_csv:
-            run_replay(q, action_q, model_path, replay_csv, args.chunk_size, args.sampling_rate)
+            run_replay(q, action_q, model_path, replay_csv, args.chunk_size, args.sampling_rate, cooldown_samples)
         else:
-            run_live(q, action_q, marker_counter, model_path, args.chunk_size)
+            run_live(q, action_q, marker_counter, model_path, args.chunk_size, cooldown_samples)
     except KeyboardInterrupt:
         print("[MAIN] KeyboardInterrupt caught.")
     except RuntimeError as exc:

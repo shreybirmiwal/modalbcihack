@@ -1,5 +1,6 @@
 {
   "accepted_from": {
+    "backend": "modal-cpu",
     "config": {
       "channels": [
         0,
@@ -20,18 +21,18 @@
         "mu",
         "beta"
       ],
-      "l2": 0.0002,
-      "learning_rate": 0.025,
-      "model": "softmax",
+      "l2": 0.003,
+      "learning_rate": 0.12,
+      "model": "perceptron",
       "smooth": 1,
       "window_size": 32,
       "window_start": 0
     },
     "cv": {
-      "balanced_accuracy": 0.4583333333333333,
-      "closed_loop_score": 1.3732127889267565,
+      "balanced_accuracy": 0.42115443042084705,
+      "closed_loop_score": 1.0015782736162984,
       "latency_cost": 0.001,
-      "macro_f1": 0.24892684414147037
+      "macro_f1": 0.2450775934600401
     },
     "data_path": [
       "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/blink_prod.csv",
@@ -42,22 +43,22 @@
       "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/right_prod2.csv"
     ],
     "dataset_id": "bff1f19f7ffc2eb6",
-    "generalization_gap": 0.07706274040128402,
+    "generalization_gap": 0.0,
     "heldout": {
-      "balanced_accuracy": 0.25,
-      "closed_loop_score": 1.337906249999987,
+      "balanced_accuracy": 0.24963924963924963,
+      "closed_loop_score": 1.3321107954545326,
       "latency_cost": 0.001,
-      "macro_f1": 0.24803149606299213
+      "macro_f1": 0.24785100286532952
     },
     "hypothesis": "tune optimizer pressure for small noisy EEG folds",
     "program_hash": "2886d277e4b9",
-    "reward": 1.3661660093022203,
+    "reward": 1.3823585210054812,
     "sealed": null,
-    "seconds": 4.499,
-    "signature": "5a6dd555fcc46a9e",
+    "seconds": 7.309,
+    "signature": "70d547a73033d433",
     "stage": 4,
     "subject": "S03",
-    "timestamp": 1780183733.247
+    "timestamp": 1780186125.641
   },
   "config": {
     "channels": [
@@ -79,9 +80,9 @@
       "mu",
       "beta"
     ],
-    "l2": 0.0002,
-    "learning_rate": 0.025,
-    "model": "softmax",
+    "l2": 0.003,
+    "learning_rate": 0.12,
+    "model": "perceptron",
     "smooth": 1,
     "window_size": 32,
     "window_start": 0
@@ -95,7 +96,7 @@
     "/Users/shreybirmiwal/projects/modalhack/bci-sdk/data/right_prod2.csv"
   ],
   "dataset_id": "bff1f19f7ffc2eb6",
-  "reward": 1.3661660093022203,
+  "reward": 1.3823585210054812,
   "stage": 4,
   "subject": "S03"
 }

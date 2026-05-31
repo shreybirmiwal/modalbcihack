@@ -99,6 +99,38 @@ The Modal path follows the hackathon distributed-compute shape:
 - the local entrypoint keeps `runs/research_log.jsonl` and
   `runs/best_pipeline_config.json` as the experiment notebook.
 
+## Run Local Claude Code Autoresearch
+
+The Karpathy-style local agent entrypoint is:
+
+```bash
+cd "auto research"
+uv run python claude_research.py --data-glob "../bci-sdk/data/*_prod*.csv" --iterations 10
+```
+
+This uses the local `claude` CLI, not Modal credits. It asks Claude Code to read
+`program.md`, `prepare.py`, `pipeline.py`, and `train.py`; edit only
+`pipeline.py`; run one experiment; then the wrapper independently re-runs
+`train.py` and keeps or discards the edit based on reward.
+
+The one-experiment metric entrypoint Claude runs is:
+
+```bash
+uv run python train.py --subject S03 --stage 4 --sealed --export-final --data-glob "../bci-sdk/data/*_prod*.csv"
+```
+
+Claude Code/API spending comes from your local Claude Code auth. You can cap it:
+
+```bash
+uv run python claude_research.py --iterations 10 --max-budget-usd 5
+```
+
+Dry-run the prompt without invoking Claude:
+
+```bash
+uv run python claude_research.py --dry-run
+```
+
 ## Final Model Inference
 
 After Modal training, run batch inference on any Alchemiac EEG CSV:

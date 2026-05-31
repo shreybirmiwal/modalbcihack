@@ -6,7 +6,7 @@ window crop, features, artifact clipping, model family, and temporal smoothing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 import math
 import random
@@ -24,6 +24,11 @@ CONFIG: dict[str, Any] = {
     "l2": 0.0005,
     "smooth": 1,
     "class_weight": "sqrt_balanced",
+    "action_channels": {
+        "1": [1],  # left_squeeze -> AF7
+        "2": [0],  # right_squeeze -> AF8
+        "3": [2],  # eye_blink -> CHEEK_R
+    },
 }
 
 
@@ -35,10 +40,14 @@ class Model:
     kind: str
     weights: list[list[float]]
     centroids: list[list[float]]
+    detectors: list[dict[str, Any]] = field(default_factory=list)
 
 
 def train(examples: list[Any], action_count: int, config: dict[str, Any] | None = None) -> Model:
     merged = _merged_config(config)
+    if _action_channels(merged) and action_count > 1:
+        return _train_channel_ovr(examples, action_count, merged)
+
     rows = [_features(example.window, merged) for example in examples]
     labels = [example.label for example in examples]
     standardized, means, scales = _standardize_fit(rows)
@@ -59,6 +68,9 @@ def train(examples: list[Any], action_count: int, config: dict[str, Any] | None 
 
 
 def predict(model: Model, examples: list[Any], config: dict[str, Any] | None = None) -> list[int]:
+    if model.kind == "channel_ovr":
+        return _predict_channel_ovr(model, examples, config)
+
     merged = dict(model.config)
     if config:
         merged.update(config)
@@ -76,6 +88,7 @@ def model_to_payload(model: Model) -> dict[str, Any]:
         "kind": model.kind,
         "weights": model.weights,
         "centroids": model.centroids,
+        "detectors": model.detectors,
     }
 
 
@@ -87,7 +100,59 @@ def model_from_payload(payload: dict[str, Any]) -> Model:
         kind=str(payload["kind"]),
         weights=[[float(value) for value in row] for row in payload.get("weights", [])],
         centroids=[[float(value) for value in row] for row in payload.get("centroids", [])],
+        detectors=list(payload.get("detectors", [])),
     )
+
+
+def _train_channel_ovr(examples: list[Any], action_count: int, config: dict[str, Any]) -> Model:
+    detectors: list[dict[str, Any]] = []
+    action_channels = _action_channels(config)
+    for label in range(1, action_count):
+        channels = action_channels.get(label)
+        if not channels:
+            continue
+        detector_config = dict(config)
+        detector_config["channels"] = channels
+        rows = [_features(example.window, detector_config) for example in examples]
+        labels = [1 if example.label == label else 0 for example in examples]
+        standardized, means, scales = _standardize_fit(rows)
+        positive_centroid = _binary_centroid(standardized, labels, 1)
+        negative_centroid = _binary_centroid(standardized, labels, 0)
+        scores = [_centroid_margin(row, positive_centroid, negative_centroid) for row in standardized]
+        detectors.append(
+            {
+                "label": label,
+                "channels": channels,
+                "config": detector_config,
+                "means": means,
+                "scales": scales,
+                "positive_centroid": positive_centroid,
+                "negative_centroid": negative_centroid,
+                "threshold": _conservative_binary_threshold(labels, scores),
+            }
+        )
+    return Model(config=config, means=[], scales=[], kind="channel_ovr", weights=[], centroids=[], detectors=detectors)
+
+
+def _predict_channel_ovr(model: Model, examples: list[Any], config: dict[str, Any] | None = None) -> list[int]:
+    predictions = []
+    for example in examples:
+        best_label = 0
+        best_margin = 0.0
+        for detector in model.detectors:
+            detector_config = dict(detector["config"])
+            if config:
+                detector_config.update({key: value for key, value in config.items() if key != "channels"})
+            row = _features(example.window, detector_config)
+            standardized = _standardize_apply(row, detector["means"], detector["scales"])
+            score = _centroid_margin(standardized, detector["positive_centroid"], detector["negative_centroid"])
+            margin = score - float(detector.get("threshold", 0.0))
+            if margin > best_margin:
+                best_margin = margin
+                best_label = int(detector["label"])
+        predictions.append(best_label)
+    smooth = int(model.config.get("smooth", 1))
+    return _smooth_predictions(predictions, smooth)
 
 
 def _features(window: list[list[float]], config: dict[str, Any]) -> list[float]:
@@ -235,6 +300,71 @@ def _class_weights(labels: list[int], action_count: int, config: dict[str, Any])
             continue
         weights.append((total / (action_count * count)) ** exponent)
     return weights
+
+
+def _positive_probability(weights: list[list[float]], row: list[float]) -> float:
+    probabilities = _softmax(_linear_scores(weights, row))
+    return probabilities[1] if len(probabilities) > 1 else 0.0
+
+
+def _best_binary_threshold(labels: list[int], scores: list[float]) -> float:
+    positives = sum(labels)
+    if positives == 0:
+        return 1.01
+    candidates = sorted(set(scores))
+    if not candidates:
+        return 0.0
+    best_threshold = 0.0
+    best_f1 = -1.0
+    for threshold in candidates:
+        predictions = [1 if score >= threshold else 0 for score in scores]
+        tp = sum(1 for label, pred in zip(labels, predictions) if label == 1 and pred == 1)
+        fp = sum(1 for label, pred in zip(labels, predictions) if label == 0 and pred == 1)
+        fn = sum(1 for label, pred in zip(labels, predictions) if label == 1 and pred == 0)
+        denom = 2 * tp + fp + fn
+        f1 = (2 * tp / denom) if denom else 0.0
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = threshold
+    return best_threshold
+
+
+def _conservative_binary_threshold(labels: list[int], scores: list[float]) -> float:
+    f1_threshold = _best_binary_threshold(labels, scores)
+    negative_scores = sorted(score for label, score in zip(labels, scores) if label == 0)
+    if not negative_scores:
+        return f1_threshold
+    index = min(len(negative_scores) - 1, int(0.995 * len(negative_scores)))
+    return max(f1_threshold, negative_scores[index])
+
+
+def _binary_centroid(rows: list[list[float]], labels: list[int], target: int) -> list[float]:
+    selected = [row for row, label in zip(rows, labels) if label == target]
+    if not selected:
+        return [0.0] * (len(rows[0]) if rows else 0)
+    width = len(selected[0])
+    return [sum(row[idx] for row in selected) / len(selected) for idx in range(width)]
+
+
+def _centroid_margin(row: list[float], positive_centroid: list[float], negative_centroid: list[float]) -> float:
+    positive_distance = sum((value - positive_centroid[idx]) ** 2 for idx, value in enumerate(row))
+    negative_distance = sum((value - negative_centroid[idx]) ** 2 for idx, value in enumerate(row))
+    return negative_distance - positive_distance
+
+
+def _action_channels(config: dict[str, Any]) -> dict[int, list[int]]:
+    raw = config.get("action_channels", {})
+    if not isinstance(raw, dict):
+        return {}
+    channels: dict[int, list[int]] = {}
+    for label, values in raw.items():
+        try:
+            label_id = int(label)
+            channel_values = [int(value) for value in values]
+        except (TypeError, ValueError):
+            continue
+        channels[label_id] = channel_values
+    return channels
 
 
 def _predict_one(model: Model, row: list[float]) -> int:

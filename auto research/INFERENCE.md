@@ -13,6 +13,13 @@ It predicts four actions:
 - `right_squeeze`
 - `eye_blink`
 
+The action detectors are channel-isolated:
+
+- `left_squeeze` only uses `AF7`.
+- `right_squeeze` only uses `AF8`.
+- `eye_blink` only uses `CHEEK_R`.
+- `nothing` is the fallback when no action-specific detector fires.
+
 ## Batch Inference
 
 From `auto research/`:
@@ -62,6 +69,9 @@ cd ../bci-sdk
 uv run AlchemiacStreamLSL.py
 uv run AlchemiacGameController.py
 ```
+
+The live controller defaults to a 2-second action cooldown so one blink/squeeze
+does not repeatedly fire. Use `--cooldown-seconds 1`, `2`, or `3` to tune it.
 
 To replay saved data through the same live inference/game path:
 

@@ -25,3 +25,14 @@ NOTES FOR AGENT:
 - Every candidate should have a short hypothesis.
 - Avoid re-trying configurations already logged in `runs/research_log.jsonl`.
 - Accept only candidates that improve reward and pass the generalization-gap guard.
+
+CLAUDE CODE AUTORESEARCH:
+- Follow the Karpathy/autoresearch setup: `prepare.py` is fixed, `pipeline.py`
+  is the agent-editable training/model file, and `train.py` is the experiment
+  entrypoint.
+- Edit only `pipeline.py`.
+- Run experiments with:
+  `uv run python train.py --subject S03 --stage 4 --sealed --export-final --data-glob "../bci-sdk/data/*_prod*.csv"`
+- Optimize `reward`; higher is better.
+- Preserve channel isolation:
+  left_squeeze -> AF7 only, right_squeeze -> AF8 only, eye_blink -> CHEEK_R only.

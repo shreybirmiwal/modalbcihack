@@ -41,7 +41,7 @@ class BCIActionInference:
         window_samples: int = 32,
         normalization_samples: int = 1250,
         stride_samples: int = 16,
-        cooldown_samples: int = 125,
+        cooldown_samples: int = 500,
         warmup_samples: int = 1250,
     ) -> None:
         self.model_path = Path(model_path)

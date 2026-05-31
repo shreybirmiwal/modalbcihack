@@ -48,13 +48,28 @@ cd bci-sdk
 uv run AlchemiacGameController.py
 ```
 
+By default the controller waits 2 seconds after an emitted BCI action before it
+can emit another one. Tune that with:
+
+```bash
+uv run AlchemiacGameController.py --cooldown-seconds 3
+```
+
 The game controller keeps the wave visualizer on the left and shows game tabs
 on the right:
 
-- Flappy Bird: `eye_blink` flaps. Space is a keyboard fallback.
-- Pong: `right_squeeze` moves the paddle up, `left_squeeze` moves it down.
-- Crossy Road: `left_squeeze` moves forward.
-- Geometry Dash: `right_squeeze` jumps.
+- Flappy Charger Bird: `eye_blink` flaps. Keep the charger bird airborne and steer it through the gaps between neon obstacle towers. Space is a keyboard fallback.
+- Pong: `right_squeeze` moves the paddle up, `left_squeeze` moves it down. Keep the energy ball in play.
+- Crossy Road: `left_squeeze` moves forward. Hop across traffic lanes and reach the safe zone.
+- Geometry Dash: `right_squeeze` jumps. Time jumps to clear the spikes.
+
+The model keeps action channels isolated:
+
+- Blink uses only `CHEEK_R`.
+- Right hand uses only `AF8`.
+- Left hand uses only `AF7`.
+- `nothing` is inferred from marker-zero windows and is the fallback when no
+  action detector fires.
 
 You can test without the headset by replaying a saved CSV through the same
 model and game path:
