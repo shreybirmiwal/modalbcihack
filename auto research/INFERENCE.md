@@ -72,6 +72,9 @@ uv run AlchemiacGameController.py
 
 The live controller defaults to a 2-second action cooldown so one blink/squeeze
 does not repeatedly fire. Use `--cooldown-seconds 1`, `2`, or `3` to tune it.
+It also requires repeated classifier agreement before emission; tune with
+`--confirm-windows` (default `3`) to reduce false positives.
+For blink-heavy false positives, raise `--blink-zscore-min-peak` above `2.6`.
 
 To replay saved data through the same live inference/game path:
 

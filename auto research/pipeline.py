@@ -16,14 +16,15 @@ CONFIG: dict[str, Any] = {
     "channels": [0, 1, 2, 3, 4, 5, 6, 7],
     "window_start": 0,
     "window_size": 32,
-    "features": ["mean", "std", "energy", "mu", "beta"],
+    "features": ["mean", "std", "energy", "mu", "beta", "peak", "kurtosis", "slope"],
     "clip": 3.0,
     "model": "centroid",
     "epochs": 18,
     "learning_rate": 0.065,
     "l2": 0.0005,
-    "smooth": 1,
+    "smooth": 0,
     "class_weight": "sqrt_balanced",
+    "threshold_percentile": 0.995,
     "action_channels": {
         "1": [1],  # left_squeeze -> AF7
         "2": [0],  # right_squeeze -> AF8
@@ -128,7 +129,7 @@ def _train_channel_ovr(examples: list[Any], action_count: int, config: dict[str,
                 "scales": scales,
                 "positive_centroid": positive_centroid,
                 "negative_centroid": negative_centroid,
-                "threshold": _conservative_binary_threshold(labels, scores),
+                "threshold": _conservative_binary_threshold(labels, scores, float(config.get("threshold_percentile", 0.995))),
             }
         )
     return Model(config=config, means=[], scales=[], kind="channel_ovr", weights=[], centroids=[], detectors=detectors)
@@ -182,11 +183,21 @@ def _features(window: list[list[float]], config: dict[str, Any]) -> list[float]:
         if "slope" in feature_names:
             vector.append((samples[-1] - samples[0]) / max(1, len(samples) - 1))
         if "mu" in feature_names:
+            vector.append(_band_energy(samples, 8.0))
             vector.append(_band_energy(samples, 10.0))
             vector.append(_band_energy(samples, 12.0))
         if "beta" in feature_names:
             vector.append(_band_energy(samples, 20.0))
             vector.append(_band_energy(samples, 26.0))
+        if "peak" in feature_names:
+            vector.append(max(abs(value) for value in samples))
+        if "kurtosis" in feature_names:
+            if len(samples) >= 2:
+                m4 = sum((value - mean) ** 4 for value in centered) / len(samples)
+                m2 = variance
+                vector.append(m4 / (m2 * m2 + 1e-9))
+            else:
+                vector.append(0.0)
 
     if "global_energy" in feature_names:
         all_samples = [value for channel in selected_channels for value in window[channel][start : start + size]]
@@ -329,12 +340,12 @@ def _best_binary_threshold(labels: list[int], scores: list[float]) -> float:
     return best_threshold
 
 
-def _conservative_binary_threshold(labels: list[int], scores: list[float]) -> float:
+def _conservative_binary_threshold(labels: list[int], scores: list[float], percentile: float = 0.985) -> float:
     f1_threshold = _best_binary_threshold(labels, scores)
     negative_scores = sorted(score for label, score in zip(labels, scores) if label == 0)
     if not negative_scores:
         return f1_threshold
-    index = min(len(negative_scores) - 1, int(0.995 * len(negative_scores)))
+    index = min(len(negative_scores) - 1, int(percentile * len(negative_scores)))
     return max(f1_threshold, negative_scores[index])
 
 

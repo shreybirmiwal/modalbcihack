@@ -101,6 +101,13 @@ The Modal path follows the hackathon distributed-compute shape:
 
 ## Run Local Claude Code Autoresearch
 
+Point Claude Code at `CLAUDE.md` if you want to run manually:
+
+```bash
+claude
+# then: read CLAUDE.md and start the BCI autoresearch loop
+```
+
 The Karpathy-style local agent entrypoint is:
 
 ```bash
@@ -113,13 +120,20 @@ This uses the local `claude` CLI, not Modal credits. It asks Claude Code to read
 `pipeline.py`; run one experiment; then the wrapper independently re-runs
 `train.py` and keeps or discards the edit based on reward.
 
+Use a larger local Claude Code/API budget when you want it to run for a while:
+
+```bash
+uv run python claude_research.py --iterations 50 --max-budget-usd 50 --data-glob "../bci-sdk/data/*_prod*.csv"
+```
+
 The one-experiment metric entrypoint Claude runs is:
 
 ```bash
 uv run python train.py --subject S03 --stage 4 --sealed --export-final --data-glob "../bci-sdk/data/*_prod*.csv"
 ```
 
-Claude Code/API spending comes from your local Claude Code auth. You can cap it:
+Claude Code/API spending comes from your local Claude Code auth, not Modal. You
+can cap it:
 
 ```bash
 uv run python claude_research.py --iterations 10 --max-budget-usd 5

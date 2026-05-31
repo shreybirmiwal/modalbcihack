@@ -683,11 +683,19 @@ h1 {
   font-size: 14px;
 }
 
-.updatesList button {
+.updatesList button,
+.updateCard {
   align-items: center;
   display: grid;
   gap: 10px;
   grid-template-columns: 82px minmax(0, 1fr);
+}
+
+.updateCard {
+  background: #0a0f0c;
+  border: 1px solid #1f2c22;
+  border-radius: 7px;
+  padding: 11px;
 }
 
 .updatesList span {

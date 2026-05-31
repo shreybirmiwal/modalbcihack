@@ -61,6 +61,7 @@ function App() {
   }, [paused]);
 
   const events = data?.events ?? [];
+  const claudeRuns = data?.claudeRuns ?? [];
   const selected = useMemo(
     () => events.find((event) => event.index === selectedIndex) ?? events.at(-1),
     [events, selectedIndex],
@@ -101,7 +102,7 @@ function App() {
         <div className="sideBlock">
           <span className="sideLabel">Compute</span>
           <strong>{data?.stats.modalCount ?? 0} Modal CPU rows</strong>
-          <p>{data?.stats.localCount ?? 0} local candidates, {data?.stats.acceptedCount ?? 0} kept improvements.</p>
+          <p>{data?.stats.localCount ?? 0} local candidates, {data?.stats.claudeCount ?? 0} Claude Code agent rows.</p>
         </div>
       </aside>
 
@@ -137,12 +138,14 @@ function App() {
           <span>LOSS WORST: {formatLoss(lossStats.worstLoss)}</span>
           <span>CANDIDATES: {data?.stats.totalCandidates ?? 0}</span>
           <span>MODAL CPU: {data?.stats.modalCount ?? 0}</span>
+          <span>CLAUDE: {data?.stats.claudeCount ?? 0}</span>
           <span>UPDATED: {lastRefresh ? lastRefresh.toLocaleTimeString() : "waiting"}</span>
         </section>
 
         <section className="metrics" aria-label="run summary">
           <Metric icon={<FlaskConical />} label="Candidates" value={data?.stats.totalCandidates ?? 0} />
           <Metric icon={<CheckCircle2 />} label="Kept" value={data?.stats.acceptedCount ?? 0} />
+          <Metric icon={<Cpu />} label="Claude Agent" value={data?.stats.claudeCount ?? 0} />
           <Metric icon={<Gauge />} label="Best Loss" value={formatLoss(lossStats.bestLoss)} />
           <Metric icon={<TrendingUp />} label="Worst Loss" value={formatLoss(lossStats.worstLoss)} />
         </section>
@@ -177,6 +180,11 @@ function App() {
           <div className="panel">
             <PanelTitle icon={<Cpu />} title="Agent Updates" meta="latest" />
             <AgentUpdates events={events} onSelect={selectExperiment} />
+          </div>
+
+          <div className="panel">
+            <PanelTitle icon={<BrainCircuit />} title="Claude Code Research" meta={`${claudeRuns.length} rows`} />
+            <ClaudeRuns runs={claudeRuns} />
           </div>
         </section>
 
@@ -506,6 +514,26 @@ function AgentUpdates({ events, onSelect }) {
             <small>{shortHypothesis(event)} · loss {formatLoss(event.validationLoss)}</small>
           </div>
         </button>
+      ))}
+    </div>
+  );
+}
+
+function ClaudeRuns({ runs }) {
+  const recent = [...runs].slice(-6).reverse();
+  if (!recent.length) return <div className="empty">No Claude Code agent rows yet.</div>;
+  return (
+    <div className="updatesList">
+      {recent.map((run) => (
+        <div key={`${run.tag}-${run.iteration}`} className="updateCard">
+          <span className={run.status === "keep" ? "positive" : run.status === "crash" ? "negative" : "neutral"}>
+            {run.status}
+          </span>
+          <div>
+            <strong>{run.tag} · iteration {run.iteration}</strong>
+            <small>reward {format(run.reward)} · {run.seconds?.toFixed?.(1) ?? run.seconds}s · {run.description}</small>
+          </div>
+        </div>
       ))}
     </div>
   );

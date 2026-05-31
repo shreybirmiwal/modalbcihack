@@ -146,6 +146,18 @@ Standout Execution in one of three factors 	• Agent Architectures & Control Lo
 - `web/`: React/Vite dashboard for visualizing candidate runs and improvement
   ladders.
 
+For Karpathy-style Claude Code autoresearch, point Claude Code at
+`auto research/CLAUDE.md`, or run:
+
+```bash
+cd "auto research"
+uv run python claude_research.py --iterations 25 --max-budget-usd 25 --data-glob "../bci-sdk/data/*_prod*.csv"
+```
+
+`pipeline.py` is the only file the agent should edit. `prepare.py` is the fixed
+evaluation harness. Live inference auto-reloads `auto research/runs/final_model.json`
+when the agent writes a newer model.
+
 ## Quick Start
 
 ```bash

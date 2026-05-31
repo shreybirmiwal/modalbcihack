@@ -104,25 +104,32 @@ class GameCanvas(QtWidgets.QWidget):
 
 
 class FlappyBirdGame(GameCanvas):
-    title = "Flappy Charger Bird"
-    control_hint = "Blink or Space flaps. Dodge every charger tower."
+    title = "Flappy Bird"
+    control_hint = "Blink or Space flaps. Any non-idle BCI action also flaps."
     accent = "#7cff6b"
 
     def reset(self):
         super().reset()
         self.bird_y = GAME_HEIGHT / 2
+        self.bird_x = 108
+        self.bird_radius = 12
         self.velocity = 0.0
         self.pipes = []
         self.tick = 0
+        self.pipe_width = 68
+        self.pipe_gap = 160
+        self.pipe_speed = 2.2
+        self.spawn_interval = 105
+        self.ground_y = GAME_HEIGHT - 46
         self.alive = True
-        self.status = "fly through charger gaps"
+        self.status = "fly through the gaps"
 
     def __init__(self):
         super().__init__()
         self.reset()
 
     def handle_action(self, action: str):
-        if action == "eye_blink":
+        if action != "nothing":
             self.flap()
 
     def handle_key(self, key: int):
@@ -133,114 +140,89 @@ class FlappyBirdGame(GameCanvas):
     def flap(self):
         if not self.alive:
             self.reset()
-        self.velocity = -7.5
+        self.velocity = -6.8
 
     def step(self):
         if not self.alive:
             return
         self.tick += 1
-        self.velocity += 0.45
+        self.velocity = min(7.5, self.velocity + 0.34)
         self.bird_y += self.velocity
-        if self.tick % 85 == 0:
-            gap_y = random.randint(120, GAME_HEIGHT - 110)
-            self.pipes.append({"x": GAME_WIDTH, "gap_y": gap_y, "scored": False})
+        if self.tick % self.spawn_interval == 0:
+            gap_y = random.randint(122, int(self.ground_y - 72))
+            self.pipes.append({"x": float(GAME_WIDTH), "gap_y": gap_y, "scored": False})
         for pipe in self.pipes:
-            pipe["x"] -= 3
-            if not pipe["scored"] and pipe["x"] < 90:
+            pipe["x"] -= self.pipe_speed
+            if not pipe["scored"] and pipe["x"] + self.pipe_width < self.bird_x - self.bird_radius:
                 pipe["scored"] = True
                 self.score += 1
-        self.pipes = [pipe for pipe in self.pipes if pipe["x"] > -70]
-        if self.bird_y < 55 or self.bird_y > GAME_HEIGHT - 20:
+        self.pipes = [pipe for pipe in self.pipes if pipe["x"] > -self.pipe_width - 4]
+        if self.bird_y < 28 or self.bird_y > self.ground_y - self.bird_radius:
             self.alive = False
             self.status = "crashed - blink or Space to restart"
         for pipe in self.pipes:
-            in_x = pipe["x"] < 110 and pipe["x"] + 55 > 70
-            in_gap = pipe["gap_y"] - 55 < self.bird_y < pipe["gap_y"] + 55
+            in_x = pipe["x"] < self.bird_x + self.bird_radius and pipe["x"] + self.pipe_width > self.bird_x - self.bird_radius
+            in_gap = pipe["gap_y"] - self.pipe_gap / 2 < self.bird_y < pipe["gap_y"] + self.pipe_gap / 2
             if in_x and not in_gap:
                 self.alive = False
-                self.status = "charger clipped an obstacle - blink or Space to restart"
-
-    def draw_bird(self, painter: QtGui.QPainter):
-        x = 92
-        y = float(self.bird_y)
-
-        cable = QtGui.QPainterPath()
-        cable.moveTo(x - 16, y + 9)
-        cable.cubicTo(x - 46, y + 28, x - 66, y - 22, x - 92, y + 4)
-        painter.setPen(QtGui.QPen(QtGui.QColor("#f8fafc"), 4, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap))
-        painter.drawPath(cable)
-
-        painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(QtGui.QColor("#e2e8f0"))
-        painter.drawRoundedRect(QtCore.QRectF(x - 105, y - 6, 16, 14), 3, 3)
-        painter.setBrush(QtGui.QColor("#94a3b8"))
-        painter.drawRect(QtCore.QRectF(x - 109, y - 2, 4, 3))
-        painter.drawRect(QtCore.QRectF(x - 109, y + 4, 4, 3))
-
-        wing_color = QtGui.QColor("#f59e0b" if self.velocity > 0 else "#fbbf24")
-        painter.setBrush(QtGui.QColor("#facc15"))
-        painter.drawEllipse(QtCore.QPointF(x, y), 22, 17)
-        painter.setBrush(wing_color)
-        wing = QtGui.QPolygonF(
-            [
-                QtCore.QPointF(x - 8, y + 1),
-                QtCore.QPointF(x - 30, y + (18 if self.velocity > 0 else -20)),
-                QtCore.QPointF(x + 4, y + 10),
-            ]
-        )
-        painter.drawPolygon(wing)
-
-        painter.setBrush(QtGui.QColor("#fb923c"))
-        beak = QtGui.QPolygonF(
-            [
-                QtCore.QPointF(x + 20, y - 3),
-                QtCore.QPointF(x + 39, y + 4),
-                QtCore.QPointF(x + 19, y + 10),
-            ]
-        )
-        painter.drawPolygon(beak)
-
-        painter.setBrush(QtGui.QColor("#0f172a"))
-        painter.drawEllipse(QtCore.QPointF(x + 10, y - 7), 3.6, 3.6)
-        painter.setBrush(QtGui.QColor("#38bdf8"))
-        painter.drawRoundedRect(QtCore.QRectF(x - 3, y + 12, 18, 11), 3, 3)
-        painter.setPen(QtGui.QPen(QtGui.QColor("#bae6fd"), 1.2))
-        painter.drawLine(QtCore.QPointF(x + 2, y + 17), QtCore.QPointF(x + 10, y + 17))
-        painter.setPen(QtCore.Qt.NoPen)
+                self.status = "hit a pipe - blink or Space to restart"
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        self.paint_background(painter, "#07130b", "#020617")
-        painter.setPen(QtGui.QPen(QtGui.QColor(124, 255, 107, 38), 1))
-        for y in range(88, GAME_HEIGHT, 38):
-            painter.drawLine(0, y, GAME_WIDTH, y - 34)
+        self.paint_background(painter, "#70c5ff", "#8ed0ff")
         painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(QtGui.QColor(124, 255, 107, 22))
-        painter.drawEllipse(QtCore.QPointF(440, 118), 74, 74)
-        self.draw_header(painter)
+        painter.setBrush(QtGui.QColor(255, 255, 255, 190))
+        painter.drawEllipse(QtCore.QPointF(84, 74), 30, 18)
+        painter.drawEllipse(QtCore.QPointF(132, 64), 40, 22)
+        painter.drawEllipse(QtCore.QPointF(430, 95), 36, 20)
+        painter.drawEllipse(QtCore.QPointF(476, 83), 44, 24)
+
+        painter.setBrush(QtGui.QColor("#7acb4d"))
+        painter.drawRect(QtCore.QRectF(0, self.ground_y - 8, GAME_WIDTH, 8))
+        painter.setBrush(QtGui.QColor("#d9c47b"))
+        painter.drawRect(QtCore.QRectF(0, self.ground_y, GAME_WIDTH, GAME_HEIGHT - self.ground_y))
+
+        painter.setPen(QtGui.QColor("#ffffff"))
+        painter.setFont(QtGui.QFont("Arial", 28, QtGui.QFont.Bold))
+        painter.drawText(QtCore.QRectF(0, 16, GAME_WIDTH, 46), QtCore.Qt.AlignCenter, str(self.score))
+
         for pipe in self.pipes:
             x = int(pipe["x"])
             gap_y = int(pipe["gap_y"])
-            tower_gradient = QtGui.QLinearGradient(x, 55, x + 62, 55)
-            tower_gradient.setColorAt(0, QtGui.QColor("#15803d"))
-            tower_gradient.setColorAt(0.5, QtGui.QColor("#86efac"))
-            tower_gradient.setColorAt(1, QtGui.QColor("#166534"))
+            top_h = max(0, gap_y - int(self.pipe_gap / 2))
+            bottom_y = gap_y + int(self.pipe_gap / 2)
             painter.setPen(QtCore.Qt.NoPen)
-            painter.setBrush(tower_gradient)
-            painter.drawRoundedRect(QtCore.QRectF(x, 64, 62, gap_y - 119), 10, 10)
-            painter.drawRoundedRect(QtCore.QRectF(x, gap_y + 55, 62, GAME_HEIGHT - gap_y - 88), 10, 10)
+            painter.setBrush(QtGui.QColor("#5ec140"))
+            painter.drawRect(QtCore.QRectF(x, 0, self.pipe_width, top_h))
+            painter.drawRect(QtCore.QRectF(x, bottom_y, self.pipe_width, self.ground_y - bottom_y))
+            painter.setBrush(QtGui.QColor("#78d657"))
+            painter.drawRect(QtCore.QRectF(x - 4, top_h - 18, self.pipe_width + 8, 18))
+            painter.drawRect(QtCore.QRectF(x - 4, bottom_y, self.pipe_width + 8, 18))
+            painter.setPen(QtGui.QPen(QtGui.QColor("#459734"), 2))
+            painter.drawLine(x + 9, 4, x + 9, top_h - 20)
+            painter.drawLine(x + 9, bottom_y + 20, x + 9, self.ground_y - 4)
 
-            painter.setBrush(QtGui.QColor("#052e16"))
-            painter.drawRoundedRect(QtCore.QRectF(x - 6, gap_y - 67, 74, 14), 7, 7)
-            painter.drawRoundedRect(QtCore.QRectF(x - 6, gap_y + 53, 74, 14), 7, 7)
-            painter.setPen(QtGui.QPen(QtGui.QColor("#bbf7d0"), 2))
-            painter.drawLine(x + 13, gap_y - 30, x + 28, gap_y - 48)
-            painter.drawLine(x + 28, gap_y - 48, x + 22, gap_y - 22)
-            painter.drawLine(x + 39, gap_y + 31, x + 25, gap_y + 48)
-            painter.drawLine(x + 25, gap_y + 48, x + 31, gap_y + 21)
-
-        self.draw_bird(painter)
-        self.draw_caption(painter, "Goal: blink to fly the charger bird through neon tower gaps.")
+        bird_x = self.bird_x
+        bird_y = int(self.bird_y)
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor("#ffd93b"))
+        painter.drawEllipse(QtCore.QPointF(bird_x, bird_y), self.bird_radius + 2, self.bird_radius)
+        painter.setBrush(QtGui.QColor("#ffbf2d"))
+        painter.drawEllipse(QtCore.QPointF(bird_x - 6, bird_y + 2), 8, 7)
+        painter.setBrush(QtGui.QColor("#ffffff"))
+        painter.drawEllipse(QtCore.QPointF(bird_x + 4, bird_y - 4), 4, 4)
+        painter.setBrush(QtGui.QColor("#111111"))
+        painter.drawEllipse(QtCore.QPointF(bird_x + 5, bird_y - 4), 1.7, 1.7)
+        beak = QtGui.QPolygonF(
+            [
+                QtCore.QPointF(bird_x + 11, bird_y - 1),
+                QtCore.QPointF(bird_x + 22, bird_y + 3),
+                QtCore.QPointF(bird_x + 11, bird_y + 7),
+            ]
+        )
+        painter.setBrush(QtGui.QColor("#f8902a"))
+        painter.drawPolygon(beak)
+        self.draw_caption(painter, "Blink or press Space to flap.")
 
 
 class PongGame(GameCanvas):
@@ -405,7 +387,7 @@ class CrossyRoadGame(GameCanvas):
 
 class GeometryDashGame(GameCanvas):
     title = "Geometry Dash"
-    control_hint = "Right squeeze or Space jumps."
+    control_hint = "Blink or Space jumps."
     accent = "#7cff6b"
 
     def __init__(self):
@@ -418,10 +400,10 @@ class GeometryDashGame(GameCanvas):
         self.velocity = 0.0
         self.on_ground = True
         self.obstacles = [{"x": GAME_WIDTH + idx * 190} for idx in range(4)]
-        self.status = "right squeeze or Space jumps"
+        self.status = "blink or Space jumps"
 
     def handle_action(self, action: str):
-        if action == "right_squeeze" and self.on_ground:
+        if action == "eye_blink" and self.on_ground:
             self.velocity = -10.0
             self.on_ground = False
 
@@ -482,7 +464,7 @@ class GeometryDashGame(GameCanvas):
                 QtCore.QPoint(x + 13, ground - 32),
             ]
             painter.drawPolygon(QtGui.QPolygon(points))
-        self.draw_caption(painter, "Goal: jump the cube over spikes with right-squeeze impulses.")
+        self.draw_caption(painter, "Goal: jump the cube over spikes with blinks.")
 
 
 def game_visualizer(
@@ -569,7 +551,7 @@ def game_visualizer(
         return QtGui.QKeySequence(key).toString() or str(key)
 
     def mapped_control(game, action: str) -> str:
-        if isinstance(game, FlappyBirdGame) and action in {"eye_blink", "Space"}:
+        if isinstance(game, FlappyBirdGame) and action in {"eye_blink", "left_squeeze", "right_squeeze", "Space"}:
             return "Flappy Bird: flap"
         if isinstance(game, PongGame):
             if action in {"right_squeeze", "Up"}:
@@ -578,7 +560,7 @@ def game_visualizer(
                 return "Pong: paddle down"
         if isinstance(game, CrossyRoadGame) and action in {"left_squeeze", "Space", "Up"}:
             return "Crossy Road: hop forward"
-        if isinstance(game, GeometryDashGame) and action in {"right_squeeze", "Space"}:
+        if isinstance(game, GeometryDashGame) and action in {"eye_blink", "Space"}:
             return "Geometry Dash: jump"
         if action == "R":
             return "Reset active game"

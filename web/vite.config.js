@@ -37,10 +37,43 @@ function readText(filePath, fallback = "") {
   }
 }
 
+function readClaudeRuns() {
+  const claudeDir = path.join(runsDir, "claude_code");
+  try {
+    return fs
+      .readdirSync(claudeDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((entry) => {
+        const tag = entry.name;
+        const resultsPath = path.join(claudeDir, tag, "results.tsv");
+        const rows = readText(resultsPath)
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .slice(1)
+          .map((line) => {
+            const [iteration, reward, status, description, seconds] = line.split("\t");
+            return {
+              tag,
+              iteration: Number(iteration),
+              reward: Number(reward),
+              status,
+              description,
+              seconds: Number(seconds),
+            };
+          });
+        return rows;
+      })
+      .filter((row) => Number.isFinite(row.iteration));
+  } catch {
+    return [];
+  }
+}
+
 function buildPayload() {
   const rows = readJsonl(path.join(runsDir, "research_log.jsonl"));
   const best = readJson(path.join(runsDir, "best_pipeline_config.json"), null);
   const program = readText(path.join(engineRoot, "program.md"));
+  const claudeRuns = readClaudeRuns();
   const bestReward = best?.reward ?? null;
   const observedBestReward = rows.reduce((max, row) => Math.max(max, row.reward ?? Number.NEGATIVE_INFINITY), Number.NEGATIVE_INFINITY);
   const lossReference = bestReward ?? (Number.isFinite(observedBestReward) ? observedBestReward : 0);
@@ -91,9 +124,11 @@ function buildPayload() {
     events,
     lineage,
     topCandidates: sorted.slice(0, 8),
+    claudeRuns,
     stats: {
       totalCandidates: events.length,
       modalCount,
+      claudeCount: claudeRuns.length,
       localCount: events.length - modalCount,
       acceptedCount,
       bestReward,

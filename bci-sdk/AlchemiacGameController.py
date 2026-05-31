@@ -60,12 +60,19 @@ def run_live(
     model_path: Path,
     chunk_size: int,
     cooldown_samples: int,
+    confirm_windows: int,
+    blink_zscore_min_peak: float,
 ):
     DATA_DIR.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     eeg_path = DATA_DIR / f"alchemiac_game_eeg_{timestamp}.csv"
     inlet = _resolve_eeg_stream()
-    inference = BCIActionInference(model_path=model_path, cooldown_samples=cooldown_samples)
+    inference = BCIActionInference(
+        model_path=model_path,
+        cooldown_samples=cooldown_samples,
+        confirm_windows=confirm_windows,
+        blink_zscore_min_peak=blink_zscore_min_peak,
+    )
 
     first_lsl_timestamp = None
     last_marker_count = 0
@@ -118,8 +125,15 @@ def run_replay(
     chunk_size: int,
     sampling_rate: int,
     cooldown_samples: int,
+    confirm_windows: int,
+    blink_zscore_min_peak: float,
 ):
-    inference = BCIActionInference(model_path=model_path, cooldown_samples=cooldown_samples)
+    inference = BCIActionInference(
+        model_path=model_path,
+        cooldown_samples=cooldown_samples,
+        confirm_windows=confirm_windows,
+        blink_zscore_min_peak=blink_zscore_min_peak,
+    )
     print(f"[MODEL] {model_path}")
     print(f"[REPLAY] {replay_csv}")
     print("[INFO] Replaying CSV through the same live inference and game path.")
@@ -158,6 +172,18 @@ def parse_args():
     parser.add_argument("--chunk-size", type=int, default=32)
     parser.add_argument("--sampling-rate", type=int, default=250)
     parser.add_argument("--cooldown-seconds", type=float, default=2.0, help="Minimum seconds between emitted BCI actions.")
+    parser.add_argument(
+        "--confirm-windows",
+        type=int,
+        default=3,
+        help="Consecutive identical non-nothing predictions required before emitting an action.",
+    )
+    parser.add_argument(
+        "--blink-zscore-min-peak",
+        type=float,
+        default=2.6,
+        help="Minimum |z| peak on CHEEK_R required before emitting eye_blink.",
+    )
     return parser.parse_args()
 
 
@@ -171,6 +197,8 @@ if __name__ == "__main__":
     model_path = Path(args.model).expanduser().resolve()
     replay_csv = Path(args.replay_csv).expanduser().resolve() if args.replay_csv else None
     cooldown_samples = max(1, int(args.cooldown_seconds * args.sampling_rate))
+    confirm_windows = max(1, int(args.confirm_windows))
+    blink_zscore_min_peak = max(0.0, float(args.blink_zscore_min_peak))
 
     q = Queue()
     action_q = Queue()
@@ -191,9 +219,28 @@ if __name__ == "__main__":
 
     try:
         if replay_csv:
-            run_replay(q, action_q, model_path, replay_csv, args.chunk_size, args.sampling_rate, cooldown_samples)
+            run_replay(
+                q,
+                action_q,
+                model_path,
+                replay_csv,
+                args.chunk_size,
+                args.sampling_rate,
+                cooldown_samples,
+                confirm_windows,
+                blink_zscore_min_peak,
+            )
         else:
-            run_live(q, action_q, marker_counter, model_path, args.chunk_size, cooldown_samples)
+            run_live(
+                q,
+                action_q,
+                marker_counter,
+                model_path,
+                args.chunk_size,
+                cooldown_samples,
+                confirm_windows,
+                blink_zscore_min_peak,
+            )
     except KeyboardInterrupt:
         print("[MAIN] KeyboardInterrupt caught.")
     except RuntimeError as exc:
